@@ -64,7 +64,11 @@ func (o *GitHubOptions) Validate(dryRun bool) error {
 }
 
 // GitHubClient returns a GitHub client.
+<<<<<<< HEAD
 func (o *GitHubOptions) GitHubClient(secretAgent *secret.Agent, dryRun bool) (client *github.Client, err error) {
+=======
+func (o *GitHubOptions) GitHubClient(secretAgent *config.SecretAgent, configAgent *config.Agent, dryRun bool) (client *github.Client, err error) {
+>>>>>>> Updates for GitHub enterprise support
 	var generator *func() []byte
 	if o.TokenPath == "" {
 		generatorFunc := func() []byte {
@@ -82,12 +86,24 @@ func (o *GitHubOptions) GitHubClient(secretAgent *secret.Agent, dryRun bool) (cl
 	if dryRun {
 		return github.NewDryRunClient(*generator, o.endpoint.Strings()...), nil
 	}
-	return github.NewClient(*generator, o.endpoint.Strings()...), nil
+
+	c, err := github.NewClient(*generator, o.endpoint.Strings()...)
+	if err != nil {
+		return nil, err
+	}
+	return c, nil
 }
 
 // GitClient returns a Git client.
+<<<<<<< HEAD
 func (o *GitHubOptions) GitClient(secretAgent *secret.Agent, dryRun bool) (client *git.Client, err error) {
 	client, err = git.NewClient()
+=======
+func (o *GitHubOptions) GitClient(secretAgent *config.SecretAgent, configAgent *config.Agent, dryRun bool) (client *git.Client, err error) {
+	c := configAgent.Config()
+	baseURL := c.Git.BaseURL
+	client, err = git.NewClient(baseURL)
+>>>>>>> Updates for GitHub enterprise support
 	if err != nil {
 		return nil, err
 	}
@@ -102,7 +118,7 @@ func (o *GitHubOptions) GitClient(secretAgent *secret.Agent, dryRun bool) (clien
 	}(client)
 
 	// Get the bot's name in order to set credentials for the Git client.
-	githubClient, err := o.GitHubClient(secretAgent, dryRun)
+	githubClient, err := o.GitHubClient(secretAgent, configAgent, dryRun)
 	if err != nil {
 		return nil, fmt.Errorf("error getting GitHub client: %v", err)
 	}

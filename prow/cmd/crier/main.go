@@ -190,7 +190,12 @@ func main() {
 			}
 		}
 
-		githubClient, err := o.github.GitHubClient(secretAgent, o.dryrun)
+		configAgent := &config.Agent{}
+		if err := configAgent.Start(o.configPath, o.jobConfigPath); err != nil {
+			logrus.WithError(err).Fatal("Error starting config agent.")
+		}
+
+		githubClient, err := o.github.GitHubClient(secretAgent, configAgent, o.dryrun)
 		if err != nil {
 			logrus.WithError(err).Fatal("Error getting GitHub client.")
 		}

@@ -47,6 +47,7 @@ type options struct {
 	port int
 
 	pluginConfig string
+	config       string
 	dryRun       bool
 	github       prowflagutil.GitHubOptions
 
@@ -70,6 +71,7 @@ func gatherOptions() options {
 	fs := flag.NewFlagSet(os.Args[0], flag.ExitOnError)
 	fs.IntVar(&o.port, "port", 8888, "Port to listen on.")
 	fs.StringVar(&o.pluginConfig, "plugin-config", "/etc/plugins/plugins.yaml", "Path to plugin config file.")
+	fs.StringVar(&o.config, "config-path", "/etc/config/config.yaml", "Path to prow config file")
 	fs.BoolVar(&o.dryRun, "dry-run", true, "Dry run for testing. Uses API tokens but does not mutate.")
 	fs.DurationVar(&o.updatePeriod, "update-period", time.Hour*24, "Period duration for periodic scans of all PRs.")
 	fs.StringVar(&o.webhookSecretFile, "hmac-secret-file", "/etc/webhook/hmac", "Path to the file containing the GitHub HMAC secret.")
@@ -107,7 +109,12 @@ func main() {
 		log.WithError(err).Fatalf("Error loading plugin config from %q.", o.pluginConfig)
 	}
 
-	githubClient, err := o.github.GitHubClient(secretAgent, o.dryRun)
+	configAgent := &config.Agent{}
+	if err := configAgent.Start(o.config, ""); err != nil {
+		logrus.WithError(err).Fatal("Error starting config agent.")
+	}
+
+	githubClient, err := o.github.GitHubClient(secretAgent, configAgent, o.dryRun)
 	if err != nil {
 		logrus.WithError(err).Fatal("Error getting GitHub client.")
 	}

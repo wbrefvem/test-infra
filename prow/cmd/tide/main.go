@@ -100,12 +100,12 @@ func main() {
 		logrus.WithError(err).Fatal("Error starting secrets agent.")
 	}
 
-	githubSync, err := o.github.GitHubClient(secretAgent, o.dryRun)
+	githubSync, err := o.github.GitHubClient(secretAgent, configAgent, o.dryRun)
 	if err != nil {
 		logrus.WithError(err).Fatal("Error getting GitHub client.")
 	}
 
-	githubStatus, err := o.github.GitHubClient(secretAgent, o.dryRun)
+	githubStatus, err := o.github.GitHubClient(secretAgent, configAgent, o.dryRun)
 	if err != nil {
 		logrus.WithError(err).Fatal("Error getting GitHub client.")
 	}
@@ -119,7 +119,7 @@ func main() {
 	githubSync.Throttle(o.syncThrottle, 3*tokensPerIteration(o.syncThrottle, configAgent.Config().Tide.SyncPeriod))
 	githubStatus.Throttle(o.statusThrottle, o.statusThrottle/2)
 
-	gitClient, err := o.github.GitClient(secretAgent, o.dryRun)
+	gitClient, err := o.github.GitClient(secretAgent, configAgent, o.dryRun)
 	if err != nil {
 		logrus.WithError(err).Fatal("Error getting Git client.")
 	}

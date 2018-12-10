@@ -239,7 +239,11 @@ func (da *DashboardAgent) HandlePrStatus(queryHandler PullRequestQueryHandler) h
 			}
 
 			// Construct query
-			ghc := github.NewClient(func() []byte { return []byte(token.AccessToken) }, githubEndpoint)
+			ghc, err := github.NewClient(func() []byte { return []byte(token.AccessToken) }, githubEndpoint)
+			if err != nil {
+				serverError("Error initializing GitHub client", err)
+				return
+			}
 			query := da.ConstructSearchQuery(login)
 			if err := r.ParseForm(); err == nil {
 				if q := r.Form.Get("query"); q != "" {

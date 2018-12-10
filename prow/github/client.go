@@ -197,25 +197,53 @@ func (c *Client) Throttle(hourlyTokens, burst int) {
 	c.throttle.throttle = throttle
 }
 
+func buildGraphQLURL(gitURL string) (string, error) {
+	parsedURL, err := url.Parse(gitURL)
+	if err != nil {
+		return "", err
+	}
+	if !parsedURL.IsAbs() {
+		return "", fmt.Errorf("your github url is malformed; it must be of the form [scheme]://[hostname][path]")
+	}
+
+	if parsedURL.Hostname() == "api.github.com" {
+		parsedURL.Path = "/graphql"
+	} else {
+		parsedURL.Path = "/api/graphql"
+	}
+
+	return parsedURL.String(), nil
+}
+
 // NewClient creates a new fully operational GitHub client.
 // 'getToken' is a generator for the GitHub access token to use.
 // 'bases' is a variadic slice of endpoints to use in order of preference.
 //   An endpoint is used when all preceding endpoints have returned a conn err.
 //   This should be used when using the ghproxy GitHub proxy cache to allow
 //   this client to bypass the cache if it is temporarily unavailable.
-func NewClient(getToken func() []byte, bases ...string) *Client {
+func NewClient(getToken func() []byte, bases ...string) (*Client, error) {
+	// We're going to assume you want the first one for the GraphQL client.
+	// Requires github.com URL to be set explicitly.
+	// This shouldn't be worse than using githubql.NewClient, which hardcodes api.github.com
+	// But it could better.
+	graphQLURL, err := buildGraphQLURL(bases[0])
+	if err != nil {
+		return nil, err
+	}
 	return &Client{
 		logger: logrus.WithField("client", "github"),
 		time:   &standardTime{},
-		gqlc: githubql.NewClient(&http.Client{
-			Timeout:   maxRequestTime,
-			Transport: &oauth2.Transport{Source: newReloadingTokenSource(getToken)},
-		}),
+		gqlc: githubql.NewEnterpriseClient(
+			graphQLURL,
+			&http.Client{
+				Timeout:   maxRequestTime,
+				Transport: &oauth2.Transport{Source: newReloadingTokenSource(getToken)},
+			}),
 		client:   &http.Client{Timeout: maxRequestTime},
 		bases:    bases,
 		getToken: getToken,
 		dry:      false,
-	}
+	}, nil
 }
 
 // NewDryRunClient creates a new client that will not perform mutating actions

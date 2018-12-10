@@ -655,7 +655,10 @@ func newClient(tokenPath string, tokens, tokenBurst int, dryRun bool, hosts ...s
 	if dryRun {
 		return github.NewDryRunClient(secretAgent.GetTokenGenerator(tokenPath), hosts...), nil
 	}
-	c := github.NewClient(secretAgent.GetTokenGenerator(tokenPath), hosts...)
+	c, err := github.NewClient(secretAgent.GetTokenGenerator(tokenPath), hosts...)
+	if err != nil {
+		return nil, err
+	}
 	if tokens > 0 && tokenBurst >= tokens {
 		return nil, fmt.Errorf("--tokens=%d must exceed --token-burst=%d", tokens, tokenBurst)
 	}

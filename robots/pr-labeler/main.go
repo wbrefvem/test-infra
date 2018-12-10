@@ -95,7 +95,10 @@ func main() {
 
 	var c client
 	if o.confirm {
-		c = github.NewClient(secretAgent.GetTokenGenerator(o.tokenPath), o.endpoint.Strings()...)
+		c, err = github.NewClient(secretAgent.GetTokenGenerator(o.tokenPath), o.endpoint.Strings()...)
+		if err != nil {
+			log.Fatalf("Initializing GitHub client failed: %s", err)
+		}
 	} else {
 		c = github.NewDryRunClient(secretAgent.GetTokenGenerator(o.tokenPath), o.endpoint.Strings()...)
 	}

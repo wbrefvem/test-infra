@@ -41,6 +41,8 @@ type options struct {
 	webhookSecretFile string
 	prowAssignments   bool
 	allowAll          bool
+
+	configPath string
 }
 
 func (o *options) Validate() error {
@@ -61,6 +63,7 @@ func gatherOptions() options {
 	fs.StringVar(&o.webhookSecretFile, "hmac-secret-file", "/etc/webhook/hmac", "Path to the file containing the GitHub HMAC secret.")
 	fs.BoolVar(&o.prowAssignments, "use-prow-assignments", true, "Use prow commands to assign cherrypicked PRs.")
 	fs.BoolVar(&o.allowAll, "allow-all", false, "Allow anybody to use automated cherrypicks by skipping Github organization membership checks.")
+	fs.StringVar(&o.configPath, "config-path", "/etc/config/config.yaml", "Path to prow config.yaml")
 	for _, group := range []flagutil.OptionGroup{&o.github} {
 		group.AddFlags(fs)
 	}
@@ -89,11 +92,16 @@ func main() {
 		logrus.WithError(err).Fatal("Error starting secrets agent.")
 	}
 
-	githubClient, err := o.github.GitHubClient(secretAgent, o.dryRun)
+	configAgent := &config.Agent{}
+	if err := configAgent.Start(o.configPath, ""); err != nil {
+		logrus.WithError(err).Fatal("Error starting config agent.")
+	}
+
+	githubClient, err := o.github.GitHubClient(secretAgent, configAgent, o.dryRun)
 	if err != nil {
 		logrus.WithError(err).Fatal("Error getting GitHub client.")
 	}
-	gitClient, err := o.github.GitClient(secretAgent, o.dryRun)
+	gitClient, err := o.github.GitClient(secretAgent, configAgent, o.dryRun)
 	if err != nil {
 		logrus.WithError(err).Fatal("Error getting Git client.")
 	}

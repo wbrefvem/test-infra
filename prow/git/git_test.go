@@ -27,7 +27,7 @@ import (
 )
 
 func TestClone(t *testing.T) {
-	lg, c, err := localgit.New()
+	lg, c, err := localgit.New("github.beescloud.com/api/v3")
 	if err != nil {
 		t.Fatalf("Making local git repo: %v", err)
 	}
@@ -94,7 +94,7 @@ func TestClone(t *testing.T) {
 }
 
 func TestCheckoutPR(t *testing.T) {
-	lg, c, err := localgit.New()
+	lg, c, err := localgit.New("github.beescloud.com/api/v3")
 	if err != nil {
 		t.Fatalf("Making local git repo: %v", err)
 	}

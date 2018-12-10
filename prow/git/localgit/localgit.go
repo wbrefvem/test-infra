@@ -26,6 +26,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/sirupsen/logrus"
+	"k8s.io/test-infra/prow/config"
 	"k8s.io/test-infra/prow/git"
 )
 
@@ -39,7 +41,7 @@ type LocalGit struct {
 }
 
 // New creates a LocalGit and a git.Client pointing at it.
-func New() (*LocalGit, *git.Client, error) {
+func New(baseURL string) (*LocalGit, *git.Client, error) {
 	g, err := exec.LookPath("git")
 	if err != nil {
 		return nil, nil, err
@@ -48,7 +50,12 @@ func New() (*LocalGit, *git.Client, error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	c, err := git.NewClient()
+
+	configAgent := &config.Agent{}
+	if err := configAgent.Start("/workspace/src/k8s.io/test-infra/prow/config.yaml", ""); err != nil {
+		logrus.WithError(err).Fatal("Error starting config agent.")
+	}
+	c, err := git.NewClient(baseURL)
 	if err != nil {
 		os.RemoveAll(t)
 		return nil, nil, err

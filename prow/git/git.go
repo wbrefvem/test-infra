@@ -31,8 +31,6 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-const github = "github.com"
-
 // Client can clone repos. It keeps a local cache, so successive clones of the
 // same repo should be quick. Create with NewClient. Be sure to clean it up.
 type Client struct {
@@ -69,7 +67,7 @@ func (c *Client) Clean() error {
 
 // NewClient returns a client that talks to GitHub. It will fail if git is not
 // in the PATH.
-func NewClient() (*Client, error) {
+func NewClient(baseURL string) (*Client, error) {
 	g, err := exec.LookPath("git")
 	if err != nil {
 		return nil, err
@@ -82,7 +80,7 @@ func NewClient() (*Client, error) {
 		logger:    logrus.WithField("client", "git"),
 		dir:       t,
 		git:       g,
-		base:      fmt.Sprintf("https://%s", github),
+		base:      baseURL,
 		repoLocks: make(map[string]*sync.Mutex),
 	}, nil
 }
@@ -138,7 +136,7 @@ func (c *Client) Clone(repo string) (*Repo, error) {
 	base := c.base
 	user, pass := c.getCredentials()
 	if user != "" && pass != "" {
-		base = fmt.Sprintf("https://%s:%s@%s", user, pass, github)
+		base = fmt.Sprintf("https://%s:%s@%s", user, pass, c.base)
 	}
 	cache := filepath.Join(c.dir, repo) + ".git"
 	if _, err := os.Stat(cache); os.IsNotExist(err) {
@@ -288,7 +286,7 @@ func (r *Repo) Push(repo, branch string) error {
 		return errors.New("cannot push without credentials - configure your git client")
 	}
 	r.logger.Infof("Pushing to '%s/%s (branch: %s)'.", r.user, repo, branch)
-	remote := fmt.Sprintf("https://%s:%s@%s/%s/%s", r.user, r.pass, github, r.user, repo)
+	remote := fmt.Sprintf("https://%s:%s@%s/%s/%s", r.user, r.pass, r.base, r.user, repo)
 	co := r.gitCommand("push", remote, branch)
 	_, err := co.CombinedOutput()
 	return err
