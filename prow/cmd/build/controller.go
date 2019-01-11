@@ -311,7 +311,7 @@ func (c *controller) buildID(pj prowjobv1.ProwJob) (string, error) {
 	if pj.Spec.Refs.Repo == "" {
 		return "", fmt.Errorf("spec refs repo is empty")
 	}
-	jobName := strings.ToLower(fmt.Sprintf("%s/%s/%s", pj.Spec.Refs.Org, pj.Spec.Refs.Repo, branch))
+	jobName := fmt.Sprintf("%s/%s/%s", pj.Spec.Refs.Org, pj.Spec.Refs.Repo, branch)
 	logrus.Infof("get build id for jobname: %s, from URL %s", jobName, c.totURL)
 	return pjutil.GetBuildID(jobName, c.totURL)
 }
