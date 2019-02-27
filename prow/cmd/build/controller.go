@@ -333,7 +333,7 @@ func reconcile(c reconciler, key string) error {
 	}
 	// JR not sure what to do.  context is 'serverless-jenkins' but the default context in c.builds is '' see https://github.com/kubernetes/test-infra/blob/6d46fd1/prow/cmd/build/main.go#L99-L100
 	// so for now let's use the default context
-	ctx = *new(string)
+	// ctx = *new(string)
 	var wantBuild bool
 
 	pj, err := c.getProwJob(name)
@@ -344,10 +344,10 @@ func reconcile(c reconciler, key string) error {
 		return fmt.Errorf("get prowjob: %v", err)
 	case pj.Spec.Agent != prowjobv1.KnativeBuildAgent:
 		// Do not want a build for this job
-	//case pj.Spec.Cluster != ctx:
-	// need to disable this check as having issues when default current context is empty
-	// Build is in wrong cluster, we do not want this build
-	//logrus.Warnf("%s found in context %s not %s", key, ctx, pj.Spec.Cluster)
+	case pj.Spec.Cluster != ctx:
+		// need to disable this check as having issues when default current context is empty
+		// Build is in wrong cluster, we do not want this build
+		logrus.Warnf("%s found in context %s not %s", key, ctx, pj.Spec.Cluster)
 	case pj.DeletionTimestamp == nil:
 		wantBuild = true
 	}
@@ -634,7 +634,7 @@ func injectTimeout(b *buildv1alpha1.Build, pj prowjobv1.ProwJob) error {
 		// TODO should get this from configuration somewhere
 		b.Spec.Timeout = &metav1.Duration{Duration: time.Hour}
 	} else {
-		b.Spec.Timeout = &metav1.Duration{Duration:pj.Spec.DecorationConfig.Timeout}
+		b.Spec.Timeout = &metav1.Duration{Duration: pj.Spec.DecorationConfig.Timeout}
 	}
 
 	return nil
