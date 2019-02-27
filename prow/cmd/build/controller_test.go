@@ -863,6 +863,15 @@ func TestMakeBuild(t *testing.T) {
 				return pj
 			},
 		},
+		{
+			name: "configure timeout when set",
+			job: func(pj prowjobv1.ProwJob) prowjobv1.ProwJob {
+				pj.Spec.DecorationConfig = &prowjobv1.DecorationConfig{
+					Timeout: 30 * time.Minute,
+				}
+				return pj
+			},
+		},
 	}
 
 	for _, tc := range cases {
