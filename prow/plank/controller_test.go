@@ -371,11 +371,13 @@ func TestTerminateDupes(t *testing.T) {
 				},
 			},
 		}
+		log := logrus.NewEntry(logrus.StandardLogger())
 		c := Controller{
-			kc:   fkc,
-			pkcs: map[string]kubeClient{kube.DefaultClusterAlias: fkc},
-			log:  logrus.NewEntry(logrus.StandardLogger()),
-			ca:   fca,
+			kc:      fkc,
+			pkcs:    map[string]kubeClient{kube.DefaultClusterAlias: fkc},
+			log:     log,
+			ca:      fca,
+			aborter: pjutil.NewProwJobAborter(fkc, log),
 		}
 
 		if err := c.terminateDupes(fkc.prowjobs, tc.pm); err != nil {
@@ -1116,13 +1118,15 @@ func TestSyncPendingJob(t *testing.T) {
 			pods: tc.pods,
 			err:  tc.err,
 		}
+		log := logrus.NewEntry(logrus.StandardLogger())
 		c := Controller{
 			kc:          fc,
 			pkcs:        map[string]kubeClient{kube.DefaultClusterAlias: fpc},
-			log:         logrus.NewEntry(logrus.StandardLogger()),
+			log:         log,
 			ca:          newFakeConfigAgent(t, 0),
 			totURL:      totServ.URL,
 			pendingJobs: make(map[string]int),
+			aborter:     pjutil.NewProwJobAborter(fc, log),
 		}
 
 		reports := make(chan kube.ProwJob, 100)
@@ -1187,15 +1191,17 @@ func TestPeriodic(t *testing.T) {
 	fc := &fkc{
 		prowjobs: []kube.ProwJob{pjutil.NewProwJob(pjutil.PeriodicSpec(per), nil)},
 	}
+	log := logrus.NewEntry(logrus.StandardLogger())
 	c := Controller{
 		kc:          fc,
 		ghc:         &fghc{},
 		pkcs:        map[string]kubeClient{kube.DefaultClusterAlias: &fkc{}, "trusted": fc},
-		log:         logrus.NewEntry(logrus.StandardLogger()),
+		log:         log,
 		ca:          newFakeConfigAgent(t, 0),
 		totURL:      totServ.URL,
 		pendingJobs: make(map[string]int),
 		lock:        sync.RWMutex{},
+		aborter:     pjutil.NewProwJobAborter(fc, log),
 	}
 	if err := c.Sync(); err != nil {
 		t.Fatalf("Error on first sync: %v", err)
@@ -1456,12 +1462,14 @@ func TestMaxConcurrencyWithNewlyTriggeredJobs(t *testing.T) {
 			prowjobs: test.pjs,
 		}
 		fpc := &fkc{}
+		log := logrus.NewEntry(logrus.StandardLogger())
 		c := Controller{
 			kc:          fc,
 			pkcs:        map[string]kubeClient{kube.DefaultClusterAlias: fpc},
-			log:         logrus.NewEntry(logrus.StandardLogger()),
 			ca:          newFakeConfigAgent(t, 0),
+			log:         log,
 			pendingJobs: test.pendingJobs,
+			aborter:     pjutil.NewProwJobAborter(fc, log),
 		}
 
 		reports := make(chan kube.ProwJob, len(test.pjs))

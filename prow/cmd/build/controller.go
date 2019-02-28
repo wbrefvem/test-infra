@@ -40,6 +40,7 @@ import (
 	untypedcorev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -55,6 +56,20 @@ import (
 const (
 	controllerName = "prow-build-crd"
 )
+
+type pjClient struct {
+	pjc       prowjobset.Interface
+	namespace string
+}
+
+func (c *pjClient) ReplaceProwJob(name string, pj prowjobv1.ProwJob) (prowjobv1.ProwJob, error) {
+	updatedPj, err := c.pjc.ProwV1().ProwJobs(c.namespace).Update(&pj)
+	if updatedPj != nil {
+		return *updatedPj, err
+	} else {
+		return prowjobv1.ProwJob{}, err
+	}
+}
 
 type controller struct {
 	pjNamespace string
@@ -72,6 +87,8 @@ type controller struct {
 	prowJobsDone bool
 	buildsDone   map[string]bool
 	wait         string
+
+	aborter pjutil.ProwJobAborter
 }
 
 // hasSynced returns true when every prowjob and build informer has synced.
@@ -117,6 +134,11 @@ func newController(kc kubernetes.Interface, pjc prowjobset.Interface, pji prowjo
 	eventBroadcaster.StartRecordingToSink(&corev1.EventSinkImpl{Interface: kc.CoreV1().Events("")})
 	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, untypedcorev1.EventSource{Component: controllerName})
 
+	pjClient := &pjClient{
+		pjc:       pjc,
+		namespace: pjNamespace,
+	}
+
 	// Create struct
 	c := &controller{
 		pjc:         pjc,
@@ -127,6 +149,7 @@ func newController(kc kubernetes.Interface, pjc prowjobset.Interface, pji prowjo
 		recorder:    recorder,
 		totURL:      totURL,
 		pjNamespace: pjNamespace,
+		aborter:     pjutil.NewProwJobAborter(pjClient, logrus.NewEntry(logrus.StandardLogger())),
 	}
 
 	logrus.Info("Setting up event handlers")
@@ -261,6 +284,35 @@ type reconciler interface {
 	updateProwJob(pj *prowjobv1.ProwJob) (*prowjobv1.ProwJob, error)
 	now() metav1.Time
 	buildID(prowjobv1.ProwJob) (string, error)
+	terminateDupProwJobs(ctx string, namespace string) error
+}
+
+func (c *controller) getProwJobs(namespace string) ([]prowjobv1.ProwJob, error) {
+	result := []prowjobv1.ProwJob{}
+	jobs, err := c.pjLister.ProwJobs(namespace).List(labels.Everything())
+	if err != nil {
+		return result, err
+	}
+	for _, job := range jobs {
+		if job.Spec.Agent == prowjobv1.KnativeBuildAgent {
+			result = append(result, *job)
+		}
+	}
+	return result, nil
+}
+
+func (c *controller) terminateDupProwJobs(ctx string, namespace string) error {
+	jobs, err := c.getProwJobs(namespace)
+	if err != nil {
+		return err
+	}
+	return c.aborter.TerminateOlderPresubmitJobs(jobs, func(toCancel prowjobv1.ProwJob) error {
+		err := c.deleteBuild(ctx, namespace, toCancel.GetName())
+		if err != nil && apierrors.IsNotFound(err) == false {
+			logrus.WithError(err).WithFields(pjutil.ProwJobFields(&toCancel)).Warn("Cannot delete build")
+		}
+		return nil
+	})
 }
 
 func (c *controller) getProwJob(name string) (*prowjobv1.ProwJob, error) {
@@ -331,9 +383,12 @@ func reconcile(c reconciler, key string) error {
 		runtime.HandleError(err)
 		return nil
 	}
-	// JR not sure what to do.  context is 'serverless-jenkins' but the default context in c.builds is '' see https://github.com/kubernetes/test-infra/blob/6d46fd1/prow/cmd/build/main.go#L99-L100
-	// so for now let's use the default context
-	// ctx = *new(string)
+
+	err = c.terminateDupProwJobs(ctx, namespace)
+	if err != nil {
+		logrus.WithError(err).Warn("Cannot terminate duplicated prow jobs")
+	}
+
 	var wantBuild bool
 
 	pj, err := c.getProwJob(name)

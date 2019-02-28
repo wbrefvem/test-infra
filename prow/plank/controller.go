@@ -92,6 +92,9 @@ type Controller struct {
 
 	// if skip report job results to github
 	skipReport bool
+
+	// terminates the duplicated prow jobs
+	aborter pjutil.ProwJobAborter
 }
 
 // NewController creates a new Controller from the provided clients.
@@ -113,6 +116,7 @@ func NewController(kc *kube.Client, pkcs map[string]*kube.Client, ghc GitHubClie
 		totURL:      totURL,
 		selector:    selector,
 		skipReport:  skipReport,
+		aborter:     pjutil.NewProwJobAborter(kc, logger),
 	}, nil
 }
 
@@ -246,24 +250,7 @@ func (c *Controller) SyncMetrics() {
 // in-place when it aborts.
 // TODO: Dry this out - need to ensure we can abstract children cancellation first.
 func (c *Controller) terminateDupes(pjs []kube.ProwJob, pm map[string]kube.Pod) error {
-	// "job org/repo#number" -> newest job
-	dupes := make(map[string]int)
-	for i, pj := range pjs {
-		if pj.Complete() || pj.Spec.Type != kube.PresubmitJob {
-			continue
-		}
-		n := fmt.Sprintf("%s %s/%s#%d", pj.Spec.Job, pj.Spec.Refs.Org, pj.Spec.Refs.Repo, pj.Spec.Refs.Pulls[0].Number)
-		prev, ok := dupes[n]
-		if !ok {
-			dupes[n] = i
-			continue
-		}
-		cancelIndex := i
-		if (&pjs[prev].Status.StartTime).Before(&pj.Status.StartTime) {
-			cancelIndex = prev
-			dupes[n] = i
-		}
-		toCancel := pjs[cancelIndex]
+	return c.aborter.TerminateOlderPresubmitJobs(pjs, func(toCancel kube.ProwJob) error {
 		// Allow aborting presubmit jobs for commits that have been superseded by
 		// newer commits in Github pull requests.
 		if c.ca.Config().Plank.AllowCancellations {
@@ -275,19 +262,8 @@ func (c *Controller) terminateDupes(pjs []kube.ProwJob, pm map[string]kube.Pod) 
 				}
 			}
 		}
-		toCancel.SetComplete()
-		prevState := toCancel.Status.State
-		toCancel.Status.State = kube.AbortedState
-		c.log.WithFields(pjutil.ProwJobFields(&toCancel)).
-			WithField("from", prevState).
-			WithField("to", toCancel.Status.State).Info("Transitioning states.")
-		npj, err := c.kc.ReplaceProwJob(toCancel.ObjectMeta.Name, toCancel)
-		if err != nil {
-			return err
-		}
-		pjs[cancelIndex] = npj
-	}
-	return nil
+		return nil
+	})
 }
 
 // TODO: Dry this out
