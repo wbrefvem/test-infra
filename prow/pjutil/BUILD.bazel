@@ -11,6 +11,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "abort.go",
         "pjutil.go",
         "tot.go",
     ],
@@ -45,6 +46,7 @@ filegroup(
 go_test(
     name = "go_default_test",
     srcs = [
+        "abort_test.go",
         "pjutil_test.go",
         "tot_test.go",
     ],
@@ -53,8 +55,10 @@ go_test(
     deps = [
         "//prow/config:go_default_library",
         "//prow/kube:go_default_library",
+        "//vendor/github.com/sirupsen/logrus:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/equality:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/diff:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
     ],
 )

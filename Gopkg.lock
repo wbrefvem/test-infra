@@ -788,14 +788,16 @@
   revision = "6025e8de665b31fa74ab1a66f2cddd8c0abf887e"
 
 [[projects]]
-  digest = "1:84745e51bea6dad51559c51eed3402d11329a4e05d390438fb49036effa85975"
+  digest = "1:7c4e597aeb0326a55e7dd2f631392d3ecdae6bf39974b0218836c3e760cbf8fd"
   name = "github.com/knative/build"
   packages = [
     "pkg/apis/build",
     "pkg/apis/build/v1alpha1",
     "pkg/client/clientset/versioned",
+    "pkg/client/clientset/versioned/fake",
     "pkg/client/clientset/versioned/scheme",
     "pkg/client/clientset/versioned/typed/build/v1alpha1",
+    "pkg/client/clientset/versioned/typed/build/v1alpha1/fake",
     "pkg/client/informers/externalversions",
     "pkg/client/informers/externalversions/build",
     "pkg/client/informers/externalversions/build/v1alpha1",
@@ -1644,6 +1646,7 @@
     "github.com/jteeuwen/go-bindata/go-bindata",
     "github.com/knative/build/pkg/apis/build/v1alpha1",
     "github.com/knative/build/pkg/client/clientset/versioned",
+    "github.com/knative/build/pkg/client/clientset/versioned/fake",
     "github.com/knative/build/pkg/client/informers/externalversions",
     "github.com/knative/build/pkg/client/informers/externalversions/build/v1alpha1",
     "github.com/knative/pkg/apis/duck/v1alpha1",

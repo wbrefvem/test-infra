@@ -74,6 +74,7 @@ type ProwConfig struct {
 	BranchProtection BranchProtection      `json:"branch-protection,omitempty"`
 	Orgs             map[string]org.Config `json:"orgs,omitempty"`
 	Gerrit           Gerrit                `json:"gerrit,omitempty"`
+	Build            Build                 `json:"build,omitempty"`
 
 	// TODO: Move this out of the main config.
 	JenkinsOperators []JenkinsOperator `json:"jenkins_operators,omitempty"`
@@ -287,6 +288,13 @@ type Branding struct {
 	BackgroundColor string `json:"background_color,omitempty"`
 	// HeaderColor is the color of the header.
 	HeaderColor string `json:"header_color,omitempty"`
+}
+
+// Build is config for the knative build controller.
+type Build struct {
+	// AllowCancellations enables aborting presubmit jobs for commits that
+	// have been superseded by newer commits in Github pull requests.
+	AllowCancellations bool `json:"allow_cancellations,omitempty"`
 }
 
 // PubSubSubscriptions maps GCP projects to a list of Topics.
