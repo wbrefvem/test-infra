@@ -1,0 +1,6 @@
+.idea
+.settings
+.vscode
+bin
+target
+node_modules

@@ -1,0 +1,28 @@
+apiVersion: skaffold/v1beta1
+kind: Config
+build:
+  tagPolicy:
+    envTemplate:
+      template: "{{.IMAGE_NAME}}:dev-latest"
+  artifacts:
+  - image: gcr.io/jenkinsx-dev/wbrefvem/prow/deck
+    bazel:
+      target: //prow/cmd/deck:image.tar
+  - image: gcr.io/jenkinsx-dev/wbrefvem/prow/hook
+    bazel:
+      target: //prow/cmd/hook:image.tar
+  - image: gcr.io/jenkinsx-dev/wbrefvem/prow/horologium
+    bazel:
+      target: //prow/cmd/horologium:image.tar
+  - image: gcr.io/jenkinsx-dev/wbrefvem/prow/idiotes
+    bazel:
+      target: //prow/cmd/idiotes:image.tar
+  - image: gcr.io/jenkinsx-dev/wbrefvem/prow/plank
+    bazel:
+      target: //prow/cmd/plank:image.tar
+  - image: gcr.io/jenkinsx-dev/wbrefvem/prow/sinker
+    bazel:
+      target: //prow/cmd/sinker:image.tar
+  - image: gcr.io/jenkinsx-dev/wbrefvem/prow/tide
+    bazel:
+      target: //prow/cmd/tide:image.tar
