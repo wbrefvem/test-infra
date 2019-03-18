@@ -23,8 +23,8 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"k8s.io/test-infra/prow/config"
-	"k8s.io/test-infra/prow/github"
 	"k8s.io/test-infra/prow/github/fakegithub"
+	"k8s.io/test-infra/prow/scallywag"
 )
 
 func TestSkipStatus(t *testing.T) {
@@ -33,11 +33,11 @@ func TestSkipStatus(t *testing.T) {
 
 		presubmits []config.Presubmit
 		sha        string
-		event      *github.GenericCommentEvent
-		prChanges  map[int][]github.PullRequestChange
-		existing   []github.Status
+		event      *scallywag.GenericCommentEvent
+		prChanges  map[int][]scallywag.PullRequestChange
+		existing   []scallywag.Status
 
-		expected []github.Status
+		expected []scallywag.Status
 	}{
 		{
 			name: "required contexts should not be skipped regardless of their state",
@@ -60,41 +60,41 @@ func TestSkipStatus(t *testing.T) {
 				},
 			},
 			sha: "shalala",
-			event: &github.GenericCommentEvent{
+			event: &scallywag.GenericCommentEvent{
 				IsPR:       true,
 				IssueState: "open",
-				Action:     github.GenericCommentActionCreated,
+				Action:     scallywag.GenericCommentActionCreated,
 				Body:       "/skip",
 				Number:     1,
-				Repo:       github.Repo{Owner: github.User{Login: "org"}, Name: "repo"},
+				Repo:       scallywag.Repo{Owner: scallywag.User{Login: "org"}, Name: "repo"},
 			},
-			existing: []github.Status{
+			existing: []scallywag.Status{
 				{
 					Context: "passing-tests",
-					State:   github.StatusSuccess,
+					State:   scallywag.StatusSuccess,
 				},
 				{
 					Context: "failed-tests",
-					State:   github.StatusFailure,
+					State:   scallywag.StatusFailure,
 				},
 				{
 					Context: "pending-tests",
-					State:   github.StatusPending,
+					State:   scallywag.StatusPending,
 				},
 			},
 
-			expected: []github.Status{
+			expected: []scallywag.Status{
 				{
 					Context: "passing-tests",
-					State:   github.StatusSuccess,
+					State:   scallywag.StatusSuccess,
 				},
 				{
 					Context: "failed-tests",
-					State:   github.StatusFailure,
+					State:   scallywag.StatusFailure,
 				},
 				{
 					Context: "pending-tests",
-					State:   github.StatusPending,
+					State:   scallywag.StatusPending,
 				},
 			},
 		},
@@ -116,33 +116,33 @@ func TestSkipStatus(t *testing.T) {
 				},
 			},
 			sha: "shalala",
-			event: &github.GenericCommentEvent{
+			event: &scallywag.GenericCommentEvent{
 				IsPR:       true,
 				IssueState: "open",
-				Action:     github.GenericCommentActionCreated,
+				Action:     scallywag.GenericCommentActionCreated,
 				Body:       "/skip",
 				Number:     1,
-				Repo:       github.Repo{Owner: github.User{Login: "org"}, Name: "repo"},
+				Repo:       scallywag.Repo{Owner: scallywag.User{Login: "org"}, Name: "repo"},
 			},
-			existing: []github.Status{
+			existing: []scallywag.Status{
 				{
-					State:   github.StatusFailure,
+					State:   scallywag.StatusFailure,
 					Context: "failed-tests",
 				},
 				{
-					State:   github.StatusPending,
+					State:   scallywag.StatusPending,
 					Context: "pending-tests",
 				},
 			},
 
-			expected: []github.Status{
+			expected: []scallywag.Status{
 				{
-					State:       github.StatusSuccess,
+					State:       scallywag.StatusSuccess,
 					Description: "Skipped",
 					Context:     "failed-tests",
 				},
 				{
-					State:       github.StatusSuccess,
+					State:       scallywag.StatusSuccess,
 					Description: "Skipped",
 					Context:     "pending-tests",
 				},
@@ -160,17 +160,17 @@ func TestSkipStatus(t *testing.T) {
 				},
 			},
 			sha: "shalala",
-			event: &github.GenericCommentEvent{
+			event: &scallywag.GenericCommentEvent{
 				IsPR:       true,
 				IssueState: "open",
-				Action:     github.GenericCommentActionCreated,
+				Action:     scallywag.GenericCommentActionCreated,
 				Body:       "/skip",
 				Number:     1,
-				Repo:       github.Repo{Owner: github.User{Login: "org"}, Name: "repo"},
+				Repo:       scallywag.Repo{Owner: scallywag.User{Login: "org"}, Name: "repo"},
 			},
-			existing: []github.Status{},
+			existing: []scallywag.Status{},
 
-			expected: []github.Status{},
+			expected: []scallywag.Status{},
 		},
 		{
 			name: "optional contexts that have succeeded should not be skipped",
@@ -184,24 +184,24 @@ func TestSkipStatus(t *testing.T) {
 				},
 			},
 			sha: "shalala",
-			event: &github.GenericCommentEvent{
+			event: &scallywag.GenericCommentEvent{
 				IsPR:       true,
 				IssueState: "open",
-				Action:     github.GenericCommentActionCreated,
+				Action:     scallywag.GenericCommentActionCreated,
 				Body:       "/skip",
 				Number:     1,
-				Repo:       github.Repo{Owner: github.User{Login: "org"}, Name: "repo"},
+				Repo:       scallywag.Repo{Owner: scallywag.User{Login: "org"}, Name: "repo"},
 			},
-			existing: []github.Status{
+			existing: []scallywag.Status{
 				{
-					State:   github.StatusSuccess,
+					State:   scallywag.StatusSuccess,
 					Context: "succeeded-tests",
 				},
 			},
 
-			expected: []github.Status{
+			expected: []scallywag.Status{
 				{
-					State:   github.StatusSuccess,
+					State:   scallywag.StatusSuccess,
 					Context: "succeeded-tests",
 				},
 			},
@@ -220,24 +220,24 @@ func TestSkipStatus(t *testing.T) {
 				},
 			},
 			sha: "shalala",
-			event: &github.GenericCommentEvent{
+			event: &scallywag.GenericCommentEvent{
 				IsPR:       true,
 				IssueState: "open",
-				Action:     github.GenericCommentActionCreated,
+				Action:     scallywag.GenericCommentActionCreated,
 				Body: `/skip
 /test job`,
 				Number: 1,
-				Repo:   github.Repo{Owner: github.User{Login: "org"}, Name: "repo"},
+				Repo:   scallywag.Repo{Owner: scallywag.User{Login: "org"}, Name: "repo"},
 			},
-			existing: []github.Status{
+			existing: []scallywag.Status{
 				{
-					State:   github.StatusFailure,
+					State:   scallywag.StatusFailure,
 					Context: "failed-tests",
 				},
 			},
-			expected: []github.Status{
+			expected: []scallywag.Status{
 				{
-					State:   github.StatusFailure,
+					State:   scallywag.StatusFailure,
 					Context: "failed-tests",
 				},
 			},
@@ -250,16 +250,16 @@ func TestSkipStatus(t *testing.T) {
 		}
 
 		fghc := &fakegithub.FakeClient{
-			IssueComments: make(map[int][]github.IssueComment),
-			PullRequests: map[int]*github.PullRequest{
+			IssueComments: make(map[int][]scallywag.IssueComment),
+			PullRequests: map[int]*scallywag.PullRequest{
 				test.event.Number: {
-					Head: github.PullRequestBranch{
+					Head: scallywag.PullRequestBranch{
 						SHA: test.sha,
 					},
 				},
 			},
 			PullRequestChanges: test.prChanges,
-			CreatedStatuses: map[string][]github.Status{
+			CreatedStatuses: map[string][]scallywag.Status{
 				test.sha: test.existing,
 			},
 		}

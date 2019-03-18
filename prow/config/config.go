@@ -42,10 +42,10 @@ import (
 	buildapi "github.com/knative/build/pkg/apis/build/v1alpha1"
 	prowapi "k8s.io/test-infra/prow/apis/prowjobs/v1"
 	"k8s.io/test-infra/prow/config/org"
-	"k8s.io/test-infra/prow/github"
 	"k8s.io/test-infra/prow/kube"
 	"k8s.io/test-infra/prow/pod-utils/decorate"
 	"k8s.io/test-infra/prow/pod-utils/downwardapi"
+	"k8s.io/test-infra/prow/scallywag"
 )
 
 // Config is a read-only snapshot of the config.
@@ -990,9 +990,9 @@ func parseProwConfig(c *Config) error {
 	}
 
 	for name, method := range c.Tide.MergeType {
-		if method != github.MergeMerge &&
-			method != github.MergeRebase &&
-			method != github.MergeSquash {
+		if method != scallywag.MergeMerge &&
+			method != scallywag.MergeRebase &&
+			method != scallywag.MergeSquash {
 			return fmt.Errorf("merge type %q for %s is not a valid type", method, name)
 		}
 	}

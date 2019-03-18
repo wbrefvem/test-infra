@@ -26,10 +26,10 @@ import (
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/util/sets"
 
-	"k8s.io/test-infra/prow/github"
 	"k8s.io/test-infra/prow/github/fakegithub"
 	"k8s.io/test-infra/prow/plugins"
 	"k8s.io/test-infra/prow/repoowners"
+	"k8s.io/test-infra/prow/scallywag"
 )
 
 type fakeOwnersClient struct {
@@ -54,10 +54,10 @@ type fakeRepoOwners struct {
 
 type fakePruner struct {
 	GitHubClient  *fakegithub.FakeClient
-	IssueComments []github.IssueComment
+	IssueComments []scallywag.IssueComment
 }
 
-func (fp *fakePruner) PruneComments(shouldPrune func(github.IssueComment) bool) {
+func (fp *fakePruner) PruneComments(shouldPrune func(scallywag.IssueComment) bool) {
 	for _, comment := range fp.IssueComments {
 		if shouldPrune(comment) {
 			fp.GitHubClient.IssueCommentsDeleted = append(fp.GitHubClient.IssueCommentsDeleted, comment.Body)
@@ -250,33 +250,33 @@ func TestLGTMComment(t *testing.T) {
 	for _, tc := range testcases {
 		t.Logf("Running scenario %q", tc.name)
 		fc := &fakegithub.FakeClient{
-			IssueComments: make(map[int][]github.IssueComment),
-			PullRequests: map[int]*github.PullRequest{
+			IssueComments: make(map[int][]scallywag.IssueComment),
+			PullRequests: map[int]*scallywag.PullRequest{
 				5: {
-					Base: github.PullRequestBranch{
+					Base: scallywag.PullRequestBranch{
 						Ref: "master",
 					},
-					Head: github.PullRequestBranch{
+					Head: scallywag.PullRequestBranch{
 						SHA: SHA,
 					},
 				},
 			},
-			PullRequestChanges: map[int][]github.PullRequestChange{
+			PullRequestChanges: map[int][]scallywag.PullRequestChange{
 				5: {
 					{Filename: "doc/README.md"},
 				},
 			},
 		}
-		e := &github.GenericCommentEvent{
-			Action:      github.GenericCommentActionCreated,
+		e := &scallywag.GenericCommentEvent{
+			Action:      scallywag.GenericCommentActionCreated,
 			IssueState:  "open",
 			IsPR:        true,
 			Body:        tc.body,
-			User:        github.User{Login: tc.commenter},
-			IssueAuthor: github.User{Login: "author"},
+			User:        scallywag.User{Login: tc.commenter},
+			IssueAuthor: scallywag.User{Login: "author"},
 			Number:      5,
-			Assignees:   []github.User{{Login: "reviewer1"}, {Login: "reviewer2"}},
-			Repo:        github.Repo{Owner: github.User{Login: "org"}, Name: "repo"},
+			Assignees:   []scallywag.User{{Login: "reviewer1"}, {Login: "reviewer2"}},
+			Repo:        scallywag.Repo{Owner: scallywag.User{Login: "org"}, Name: "repo"},
 			HTMLURL:     "<url>",
 		}
 		if tc.hasLGTM {
@@ -411,33 +411,33 @@ func TestLGTMCommentWithLGTMNoti(t *testing.T) {
 	SHA := "0bd3ed50c88cd53a09316bf7a298f900e9371652"
 	for _, tc := range testcases {
 		fc := &fakegithub.FakeClient{
-			IssueComments: make(map[int][]github.IssueComment),
-			PullRequests: map[int]*github.PullRequest{
+			IssueComments: make(map[int][]scallywag.IssueComment),
+			PullRequests: map[int]*scallywag.PullRequest{
 				5: {
-					Head: github.PullRequestBranch{
+					Head: scallywag.PullRequestBranch{
 						SHA: SHA,
 					},
 				},
 			},
 		}
-		e := &github.GenericCommentEvent{
-			Action:      github.GenericCommentActionCreated,
+		e := &scallywag.GenericCommentEvent{
+			Action:      scallywag.GenericCommentActionCreated,
 			IssueState:  "open",
 			IsPR:        true,
 			Body:        tc.body,
-			User:        github.User{Login: tc.commenter},
-			IssueAuthor: github.User{Login: "author"},
+			User:        scallywag.User{Login: tc.commenter},
+			IssueAuthor: scallywag.User{Login: "author"},
 			Number:      5,
-			Assignees:   []github.User{{Login: "reviewer1"}, {Login: "reviewer2"}},
-			Repo:        github.Repo{Owner: github.User{Login: "org"}, Name: "repo"},
+			Assignees:   []scallywag.User{{Login: "reviewer1"}, {Login: "reviewer2"}},
+			Repo:        scallywag.Repo{Owner: scallywag.User{Login: "org"}, Name: "repo"},
 			HTMLURL:     "<url>",
 		}
 		botName, err := fc.BotName()
 		if err != nil {
 			t.Fatalf("For case %s, could not get Bot nam", tc.name)
 		}
-		ic := github.IssueComment{
-			User: github.User{
+		ic := scallywag.IssueComment{
+			User: scallywag.User{
 				Login: botName,
 			},
 			Body: removeLGTMLabelNoti,
@@ -475,7 +475,7 @@ func TestLGTMCommentWithLGTMNoti(t *testing.T) {
 func TestLGTMFromApproveReview(t *testing.T) {
 	var testcases = []struct {
 		name          string
-		state         github.ReviewState
+		state         scallywag.ReviewState
 		body          string
 		reviewer      string
 		hasLGTM       bool
@@ -486,7 +486,7 @@ func TestLGTMFromApproveReview(t *testing.T) {
 	}{
 		{
 			name:          "Request changes review by reviewer, no lgtm on pr",
-			state:         github.ReviewStateChangesRequested,
+			state:         scallywag.ReviewStateChangesRequested,
 			reviewer:      "reviewer1",
 			hasLGTM:       false,
 			shouldToggle:  false,
@@ -495,7 +495,7 @@ func TestLGTMFromApproveReview(t *testing.T) {
 		},
 		{
 			name:         "Request changes review by reviewer, lgtm on pr",
-			state:        github.ReviewStateChangesRequested,
+			state:        scallywag.ReviewStateChangesRequested,
 			reviewer:     "reviewer1",
 			hasLGTM:      true,
 			shouldToggle: true,
@@ -503,7 +503,7 @@ func TestLGTMFromApproveReview(t *testing.T) {
 		},
 		{
 			name:          "Approve review by reviewer, no lgtm on pr",
-			state:         github.ReviewStateApproved,
+			state:         scallywag.ReviewStateApproved,
 			reviewer:      "reviewer1",
 			hasLGTM:       false,
 			shouldToggle:  true,
@@ -512,7 +512,7 @@ func TestLGTMFromApproveReview(t *testing.T) {
 		},
 		{
 			name:          "Approve review by reviewer, no lgtm on pr, do not store tree_hash",
-			state:         github.ReviewStateApproved,
+			state:         scallywag.ReviewStateApproved,
 			reviewer:      "reviewer1",
 			hasLGTM:       false,
 			shouldToggle:  true,
@@ -520,7 +520,7 @@ func TestLGTMFromApproveReview(t *testing.T) {
 		},
 		{
 			name:         "Approve review by reviewer, lgtm on pr",
-			state:        github.ReviewStateApproved,
+			state:        scallywag.ReviewStateApproved,
 			reviewer:     "reviewer1",
 			hasLGTM:      true,
 			shouldToggle: false,
@@ -528,7 +528,7 @@ func TestLGTMFromApproveReview(t *testing.T) {
 		},
 		{
 			name:          "Approve review by non-reviewer, no lgtm on pr",
-			state:         github.ReviewStateApproved,
+			state:         scallywag.ReviewStateApproved,
 			reviewer:      "o",
 			hasLGTM:       false,
 			shouldToggle:  true,
@@ -538,7 +538,7 @@ func TestLGTMFromApproveReview(t *testing.T) {
 		},
 		{
 			name:          "Request changes review by non-reviewer, no lgtm on pr",
-			state:         github.ReviewStateChangesRequested,
+			state:         scallywag.ReviewStateChangesRequested,
 			reviewer:      "o",
 			hasLGTM:       false,
 			shouldToggle:  false,
@@ -547,7 +547,7 @@ func TestLGTMFromApproveReview(t *testing.T) {
 		},
 		{
 			name:          "Approve review by rando",
-			state:         github.ReviewStateApproved,
+			state:         scallywag.ReviewStateApproved,
 			reviewer:      "not-in-the-org",
 			hasLGTM:       false,
 			shouldToggle:  false,
@@ -556,7 +556,7 @@ func TestLGTMFromApproveReview(t *testing.T) {
 		},
 		{
 			name:          "Comment review by issue author, no lgtm on pr",
-			state:         github.ReviewStateCommented,
+			state:         scallywag.ReviewStateCommented,
 			reviewer:      "author",
 			hasLGTM:       false,
 			shouldToggle:  false,
@@ -565,7 +565,7 @@ func TestLGTMFromApproveReview(t *testing.T) {
 		},
 		{
 			name:          "Comment body has /lgtm on Comment Review ",
-			state:         github.ReviewStateCommented,
+			state:         scallywag.ReviewStateCommented,
 			reviewer:      "reviewer1",
 			body:          "/lgtm",
 			hasLGTM:       false,
@@ -575,7 +575,7 @@ func TestLGTMFromApproveReview(t *testing.T) {
 		},
 		{
 			name:          "Comment body has /lgtm cancel on Approve Review",
-			state:         github.ReviewStateApproved,
+			state:         scallywag.ReviewStateApproved,
 			reviewer:      "reviewer1",
 			body:          "/lgtm cancel",
 			hasLGTM:       false,
@@ -587,20 +587,20 @@ func TestLGTMFromApproveReview(t *testing.T) {
 	SHA := "0bd3ed50c88cd53a09316bf7a298f900e9371652"
 	for _, tc := range testcases {
 		fc := &fakegithub.FakeClient{
-			IssueComments:    make(map[int][]github.IssueComment),
+			IssueComments:    make(map[int][]scallywag.IssueComment),
 			IssueLabelsAdded: []string{},
-			PullRequests: map[int]*github.PullRequest{
+			PullRequests: map[int]*scallywag.PullRequest{
 				5: {
-					Head: github.PullRequestBranch{
+					Head: scallywag.PullRequestBranch{
 						SHA: SHA,
 					},
 				},
 			},
 		}
-		e := &github.ReviewEvent{
-			Review:      github.Review{Body: tc.body, State: tc.state, HTMLURL: "<url>", User: github.User{Login: tc.reviewer}},
-			PullRequest: github.PullRequest{User: github.User{Login: "author"}, Assignees: []github.User{{Login: "reviewer1"}, {Login: "reviewer2"}}, Number: 5},
-			Repo:        github.Repo{Owner: github.User{Login: "org"}, Name: "repo"},
+		e := &scallywag.ReviewEvent{
+			Review:      scallywag.Review{Body: tc.body, State: tc.state, HTMLURL: "<url>", User: scallywag.User{Login: tc.reviewer}},
+			PullRequest: scallywag.PullRequest{User: scallywag.User{Login: "author"}, Assignees: []scallywag.User{{Login: "reviewer1"}, {Login: "reviewer2"}}, Number: 5},
+			Repo:        scallywag.Repo{Owner: scallywag.User{Login: "org"}, Name: "repo"},
 		}
 		if tc.hasLGTM {
 			fc.IssueLabelsAdded = append(fc.IssueLabelsAdded, "org/repo#5:"+LGTMLabel)
@@ -665,43 +665,43 @@ func TestHandlePullRequest(t *testing.T) {
 	treeSHA := "6dcb09b5b57875f334f61aebed695e2e4193db5e"
 	cases := []struct {
 		name             string
-		event            github.PullRequestEvent
+		event            scallywag.PullRequestEvent
 		removeLabelErr   error
 		createCommentErr error
 
 		err                error
 		IssueLabelsAdded   []string
 		IssueLabelsRemoved []string
-		issueComments      map[int][]github.IssueComment
+		issueComments      map[int][]scallywag.IssueComment
 		trustedTeam        string
 
 		expectNoComments bool
 	}{
 		{
 			name: "pr_synchronize, no RemoveLabel error",
-			event: github.PullRequestEvent{
-				Action: github.PullRequestActionSynchronize,
-				PullRequest: github.PullRequest{
+			event: scallywag.PullRequestEvent{
+				Action: scallywag.PullRequestActionSynchronize,
+				PullRequest: scallywag.PullRequest{
 					Number: 101,
-					Base: github.PullRequestBranch{
-						Repo: github.Repo{
-							Owner: github.User{
+					Base: scallywag.PullRequestBranch{
+						Repo: scallywag.Repo{
+							Owner: scallywag.User{
 								Login: "kubernetes",
 							},
 							Name: "kubernetes",
 						},
 					},
-					Head: github.PullRequestBranch{
+					Head: scallywag.PullRequestBranch{
 						SHA: SHA,
 					},
 				},
 			},
 			IssueLabelsRemoved: []string{LGTMLabel},
-			issueComments: map[int][]github.IssueComment{
+			issueComments: map[int][]scallywag.IssueComment{
 				101: {
 					{
 						Body: removeLGTMLabelNoti,
-						User: github.User{Login: fakegithub.Bot},
+						User: scallywag.User{Login: fakegithub.Bot},
 					},
 				},
 			},
@@ -709,19 +709,19 @@ func TestHandlePullRequest(t *testing.T) {
 		},
 		{
 			name: "Sticky LGTM for trusted team members",
-			event: github.PullRequestEvent{
-				Action: github.PullRequestActionSynchronize,
-				PullRequest: github.PullRequest{
+			event: scallywag.PullRequestEvent{
+				Action: scallywag.PullRequestActionSynchronize,
+				PullRequest: scallywag.PullRequest{
 					Number: 101,
-					Base: github.PullRequestBranch{
-						Repo: github.Repo{
-							Owner: github.User{
+					Base: scallywag.PullRequestBranch{
+						Repo: scallywag.Repo{
+							Owner: scallywag.User{
 								Login: "kubernetes",
 							},
 							Name: "kubernetes",
 						},
 					},
-					User: github.User{
+					User: scallywag.User{
 						Login: "sig-lead",
 					},
 					MergeSHA: &SHA,
@@ -732,30 +732,30 @@ func TestHandlePullRequest(t *testing.T) {
 		},
 		{
 			name: "LGTM not sticky for trusted user if disabled",
-			event: github.PullRequestEvent{
-				Action: github.PullRequestActionSynchronize,
-				PullRequest: github.PullRequest{
+			event: scallywag.PullRequestEvent{
+				Action: scallywag.PullRequestActionSynchronize,
+				PullRequest: scallywag.PullRequest{
 					Number: 101,
-					Base: github.PullRequestBranch{
-						Repo: github.Repo{
-							Owner: github.User{
+					Base: scallywag.PullRequestBranch{
+						Repo: scallywag.Repo{
+							Owner: scallywag.User{
 								Login: "kubernetes",
 							},
 							Name: "kubernetes",
 						},
 					},
-					User: github.User{
+					User: scallywag.User{
 						Login: "sig-lead",
 					},
 					MergeSHA: &SHA,
 				},
 			},
 			IssueLabelsRemoved: []string{LGTMLabel},
-			issueComments: map[int][]github.IssueComment{
+			issueComments: map[int][]scallywag.IssueComment{
 				101: {
 					{
 						Body: removeLGTMLabelNoti,
-						User: github.User{Login: fakegithub.Bot},
+						User: scallywag.User{Login: fakegithub.Bot},
 					},
 				},
 			},
@@ -763,30 +763,30 @@ func TestHandlePullRequest(t *testing.T) {
 		},
 		{
 			name: "LGTM not sticky for non trusted user",
-			event: github.PullRequestEvent{
-				Action: github.PullRequestActionSynchronize,
-				PullRequest: github.PullRequest{
+			event: scallywag.PullRequestEvent{
+				Action: scallywag.PullRequestActionSynchronize,
+				PullRequest: scallywag.PullRequest{
 					Number: 101,
-					Base: github.PullRequestBranch{
-						Repo: github.Repo{
-							Owner: github.User{
+					Base: scallywag.PullRequestBranch{
+						Repo: scallywag.Repo{
+							Owner: scallywag.User{
 								Login: "kubernetes",
 							},
 							Name: "kubernetes",
 						},
 					},
-					User: github.User{
+					User: scallywag.User{
 						Login: "sig-lead",
 					},
 					MergeSHA: &SHA,
 				},
 			},
 			IssueLabelsRemoved: []string{LGTMLabel},
-			issueComments: map[int][]github.IssueComment{
+			issueComments: map[int][]scallywag.IssueComment{
 				101: {
 					{
 						Body: removeLGTMLabelNoti,
-						User: github.User{Login: fakegithub.Bot},
+						User: scallywag.User{Login: fakegithub.Bot},
 					},
 				},
 			},
@@ -795,35 +795,35 @@ func TestHandlePullRequest(t *testing.T) {
 		},
 		{
 			name: "pr_assigned",
-			event: github.PullRequestEvent{
+			event: scallywag.PullRequestEvent{
 				Action: "assigned",
 			},
 			expectNoComments: true,
 		},
 		{
 			name: "pr_synchronize, same tree-hash, keep label",
-			event: github.PullRequestEvent{
-				Action: github.PullRequestActionSynchronize,
-				PullRequest: github.PullRequest{
+			event: scallywag.PullRequestEvent{
+				Action: scallywag.PullRequestActionSynchronize,
+				PullRequest: scallywag.PullRequest{
 					Number: 101,
-					Base: github.PullRequestBranch{
-						Repo: github.Repo{
-							Owner: github.User{
+					Base: scallywag.PullRequestBranch{
+						Repo: scallywag.Repo{
+							Owner: scallywag.User{
 								Login: "kubernetes",
 							},
 							Name: "kubernetes",
 						},
 					},
-					Head: github.PullRequestBranch{
+					Head: scallywag.PullRequestBranch{
 						SHA: SHA,
 					},
 				},
 			},
-			issueComments: map[int][]github.IssueComment{
+			issueComments: map[int][]scallywag.IssueComment{
 				101: {
 					{
 						Body: fmt.Sprintf(addLGTMLabelNotification, treeSHA),
-						User: github.User{Login: fakegithub.Bot},
+						User: scallywag.User{Login: fakegithub.Bot},
 					},
 				},
 			},
@@ -831,29 +831,29 @@ func TestHandlePullRequest(t *testing.T) {
 		},
 		{
 			name: "pr_synchronize, same tree-hash, keep label, edited comment",
-			event: github.PullRequestEvent{
-				Action: github.PullRequestActionSynchronize,
-				PullRequest: github.PullRequest{
+			event: scallywag.PullRequestEvent{
+				Action: scallywag.PullRequestActionSynchronize,
+				PullRequest: scallywag.PullRequest{
 					Number: 101,
-					Base: github.PullRequestBranch{
-						Repo: github.Repo{
-							Owner: github.User{
+					Base: scallywag.PullRequestBranch{
+						Repo: scallywag.Repo{
+							Owner: scallywag.User{
 								Login: "kubernetes",
 							},
 							Name: "kubernetes",
 						},
 					},
-					Head: github.PullRequestBranch{
+					Head: scallywag.PullRequestBranch{
 						SHA: SHA,
 					},
 				},
 			},
 			IssueLabelsRemoved: []string{LGTMLabel},
-			issueComments: map[int][]github.IssueComment{
+			issueComments: map[int][]scallywag.IssueComment{
 				101: {
 					{
 						Body:      fmt.Sprintf(addLGTMLabelNotification, treeSHA),
-						User:      github.User{Login: fakegithub.Bot},
+						User:      scallywag.User{Login: fakegithub.Bot},
 						CreatedAt: time.Date(1981, 2, 21, 12, 30, 0, 0, time.UTC),
 						UpdatedAt: time.Date(1981, 2, 21, 12, 31, 0, 0, time.UTC),
 					},
@@ -863,32 +863,32 @@ func TestHandlePullRequest(t *testing.T) {
 		},
 		{
 			name: "pr_synchronize, 2 tree-hash comments, keep label",
-			event: github.PullRequestEvent{
-				Action: github.PullRequestActionSynchronize,
-				PullRequest: github.PullRequest{
+			event: scallywag.PullRequestEvent{
+				Action: scallywag.PullRequestActionSynchronize,
+				PullRequest: scallywag.PullRequest{
 					Number: 101,
-					Base: github.PullRequestBranch{
-						Repo: github.Repo{
-							Owner: github.User{
+					Base: scallywag.PullRequestBranch{
+						Repo: scallywag.Repo{
+							Owner: scallywag.User{
 								Login: "kubernetes",
 							},
 							Name: "kubernetes",
 						},
 					},
-					Head: github.PullRequestBranch{
+					Head: scallywag.PullRequestBranch{
 						SHA: SHA,
 					},
 				},
 			},
-			issueComments: map[int][]github.IssueComment{
+			issueComments: map[int][]scallywag.IssueComment{
 				101: {
 					{
 						Body: fmt.Sprintf(addLGTMLabelNotification, "older_treeSHA"),
-						User: github.User{Login: fakegithub.Bot},
+						User: scallywag.User{Login: fakegithub.Bot},
 					},
 					{
 						Body: fmt.Sprintf(addLGTMLabelNotification, treeSHA),
-						User: github.User{Login: fakegithub.Bot},
+						User: scallywag.User{Login: fakegithub.Bot},
 					},
 				},
 			},
@@ -899,22 +899,22 @@ func TestHandlePullRequest(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			fakeGitHub := &fakegithub.FakeClient{
 				IssueComments: c.issueComments,
-				PullRequests: map[int]*github.PullRequest{
+				PullRequests: map[int]*scallywag.PullRequest{
 					101: {
-						Base: github.PullRequestBranch{
+						Base: scallywag.PullRequestBranch{
 							Ref: "master",
 						},
-						Head: github.PullRequestBranch{
+						Head: scallywag.PullRequestBranch{
 							SHA: SHA,
 						},
 					},
 				},
-				Commits:          make(map[string]github.SingleCommit),
+				Commits:          make(map[string]scallywag.SingleCommit),
 				Collaborators:    []string{"collab"},
 				IssueLabelsAdded: c.IssueLabelsAdded,
 			}
 			fakeGitHub.IssueLabelsAdded = append(fakeGitHub.IssueLabelsAdded, "kubernetes/kubernetes#101:lgtm")
-			commit := github.SingleCommit{}
+			commit := scallywag.SingleCommit{}
 			commit.Commit.Tree.SHA = treeSHA
 			fakeGitHub.Commits[SHA] = commit
 			pc := &plugins.Configuration{}
@@ -999,8 +999,8 @@ func TestAddTreeHashComment(t *testing.T) {
 			rc := reviewCtx{
 				author:      "alice",
 				issueAuthor: c.author,
-				repo: github.Repo{
-					Owner: github.User{
+				repo: scallywag.Repo{
+					Owner: scallywag.User{
 						Login: "kubernetes",
 					},
 					Name: "kubernetes",
@@ -1009,20 +1009,20 @@ func TestAddTreeHashComment(t *testing.T) {
 				body:   "/lgtm",
 			}
 			fc := &fakegithub.FakeClient{
-				Commits:       make(map[string]github.SingleCommit),
-				IssueComments: map[int][]github.IssueComment{},
-				PullRequests: map[int]*github.PullRequest{
+				Commits:       make(map[string]scallywag.SingleCommit),
+				IssueComments: map[int][]scallywag.IssueComment{},
+				PullRequests: map[int]*scallywag.PullRequest{
 					101: {
-						Base: github.PullRequestBranch{
+						Base: scallywag.PullRequestBranch{
 							Ref: "master",
 						},
-						Head: github.PullRequestBranch{
+						Head: scallywag.PullRequestBranch{
 							SHA: SHA,
 						},
 					},
 				},
 			}
-			commit := github.SingleCommit{}
+			commit := scallywag.SingleCommit{}
 			commit.Commit.Tree.SHA = treeSHA
 			fc.Commits[SHA] = commit
 			handle(true, pc, &fakeOwnersClient{}, rc, fc, logrus.WithField("plugin", PluginName), &fakePruner{})
@@ -1056,22 +1056,22 @@ func TestRemoveTreeHashComment(t *testing.T) {
 	rc := reviewCtx{
 		author:      "alice",
 		issueAuthor: "bob",
-		repo: github.Repo{
-			Owner: github.User{
+		repo: scallywag.Repo{
+			Owner: scallywag.User{
 				Login: "kubernetes",
 			},
 			Name: "kubernetes",
 		},
-		assignees: []github.User{{Login: "alice"}},
+		assignees: []scallywag.User{{Login: "alice"}},
 		number:    101,
 		body:      "/lgtm cancel",
 	}
 	fc := &fakegithub.FakeClient{
-		IssueComments: map[int][]github.IssueComment{
+		IssueComments: map[int][]scallywag.IssueComment{
 			101: {
 				{
 					Body: fmt.Sprintf(addLGTMLabelNotification, treeSHA),
-					User: github.User{Login: fakegithub.Bot},
+					User: scallywag.User{Login: fakegithub.Bot},
 				},
 			},
 		},

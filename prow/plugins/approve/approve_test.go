@@ -31,8 +31,9 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/test-infra/prow/config"
-	"k8s.io/test-infra/prow/github"
 	"k8s.io/test-infra/prow/github/fakegithub"
+	"k8s.io/test-infra/prow/scallywag"
+
 	"k8s.io/test-infra/prow/labels"
 	"k8s.io/test-infra/prow/plugins"
 	"k8s.io/test-infra/prow/plugins/approve/approvers"
@@ -80,59 +81,59 @@ func TestPluginConfig(t *testing.T) {
 	}
 }
 
-func newTestComment(user, body string) github.IssueComment {
-	return github.IssueComment{User: github.User{Login: user}, Body: body}
+func newTestComment(user, body string) scallywag.IssueComment {
+	return scallywag.IssueComment{User: scallywag.User{Login: user}, Body: body}
 }
 
-func newTestCommentTime(t time.Time, user, body string) github.IssueComment {
+func newTestCommentTime(t time.Time, user, body string) scallywag.IssueComment {
 	c := newTestComment(user, body)
 	c.CreatedAt = t
 	return c
 }
 
-func newTestReview(user, body string, state github.ReviewState) github.Review {
-	return github.Review{User: github.User{Login: user}, Body: body, State: state}
+func newTestReview(user, body string, state scallywag.ReviewState) scallywag.Review {
+	return scallywag.Review{User: scallywag.User{Login: user}, Body: body, State: state}
 }
 
-func newTestReviewTime(t time.Time, user, body string, state github.ReviewState) github.Review {
+func newTestReviewTime(t time.Time, user, body string, state scallywag.ReviewState) scallywag.Review {
 	r := newTestReview(user, body, state)
 	r.SubmittedAt = t
 	return r
 }
 
-func newFakeGitHubClient(hasLabel, humanApproved bool, files []string, comments []github.IssueComment, reviews []github.Review) *fakegithub.FakeClient {
+func newFakeGitHubClient(hasLabel, humanApproved bool, files []string, comments []scallywag.IssueComment, reviews []scallywag.Review) *fakegithub.FakeClient {
 	labels := []string{"org/repo#1:lgtm"}
 	if hasLabel {
 		labels = append(labels, fmt.Sprintf("org/repo#%v:approved", prNumber))
 	}
-	events := []github.ListedIssueEvent{
+	events := []scallywag.ListedIssueEvent{
 		{
-			Event: github.IssueActionLabeled,
-			Label: github.Label{Name: "approved"},
-			Actor: github.User{Login: "k8s-merge-robot"},
+			Event: scallywag.IssueActionLabeled,
+			Label: scallywag.Label{Name: "approved"},
+			Actor: scallywag.User{Login: "k8s-merge-robot"},
 		},
 	}
 	if humanApproved {
 		events = append(
 			events,
-			github.ListedIssueEvent{
-				Event:     github.IssueActionLabeled,
-				Label:     github.Label{Name: "approved"},
-				Actor:     github.User{Login: "human"},
+			scallywag.ListedIssueEvent{
+				Event:     scallywag.IssueActionLabeled,
+				Label:     scallywag.Label{Name: "approved"},
+				Actor:     scallywag.User{Login: "human"},
 				CreatedAt: time.Now(),
 			},
 		)
 	}
-	var changes []github.PullRequestChange
+	var changes []scallywag.PullRequestChange
 	for _, file := range files {
-		changes = append(changes, github.PullRequestChange{Filename: file})
+		changes = append(changes, scallywag.PullRequestChange{Filename: file})
 	}
 	return &fakegithub.FakeClient{
 		IssueLabelsAdded:   labels,
-		PullRequestChanges: map[int][]github.PullRequestChange{prNumber: changes},
-		IssueComments:      map[int][]github.IssueComment{prNumber: comments},
-		IssueEvents:        map[int][]github.ListedIssueEvent{prNumber: events},
-		Reviews:            map[int][]github.Review{prNumber: reviews},
+		PullRequestChanges: map[int][]scallywag.PullRequestChange{prNumber: changes},
+		IssueComments:      map[int][]scallywag.IssueComment{prNumber: comments},
+		IssueEvents:        map[int][]scallywag.ListedIssueEvent{prNumber: events},
+		Reviews:            map[int][]scallywag.Review{prNumber: reviews},
 	}
 }
 
@@ -166,8 +167,8 @@ func TestHandle(t *testing.T) {
 		hasLabel      bool
 		humanApproved bool
 		files         []string
-		comments      []github.IssueComment
-		reviews       []github.Review
+		comments      []scallywag.IssueComment
+		reviews       []scallywag.Review
 
 		selfApprove         bool
 		needsIssue          bool
@@ -187,8 +188,8 @@ func TestHandle(t *testing.T) {
 			name:                "initial notification (approved)",
 			hasLabel:            false,
 			files:               []string{"c/c.go"},
-			comments:            []github.IssueComment{},
-			reviews:             []github.Review{},
+			comments:            []scallywag.IssueComment{},
+			reviews:             []scallywag.Review{},
 			selfApprove:         true,
 			needsIssue:          false,
 			lgtmActsAsApprove:   false,
@@ -220,8 +221,8 @@ Approvers can cancel approval by writing ` + "`/approve cancel`" + ` in a commen
 			name:                "initial notification (unapproved)",
 			hasLabel:            false,
 			files:               []string{"c/c.go"},
-			comments:            []github.IssueComment{},
-			reviews:             []github.Review{},
+			comments:            []scallywag.IssueComment{},
+			reviews:             []scallywag.Review{},
 			selfApprove:         false,
 			needsIssue:          false,
 			lgtmActsAsApprove:   false,
@@ -257,8 +258,8 @@ Approvers can cancel approval by writing ` + "`/approve cancel`" + ` in a commen
 			name:                "no-issue comment",
 			hasLabel:            false,
 			files:               []string{"a/a.go"},
-			comments:            []github.IssueComment{newTestComment("Alice", "stuff\n/approve no-issue \nmore stuff")},
-			reviews:             []github.Review{},
+			comments:            []scallywag.IssueComment{newTestComment("Alice", "stuff\n/approve no-issue \nmore stuff")},
+			reviews:             []scallywag.Review{},
 			selfApprove:         false,
 			needsIssue:          true,
 			lgtmActsAsApprove:   false,
@@ -293,8 +294,8 @@ Approvers can cancel approval by writing ` + "`/approve cancel`" + ` in a commen
 			prBody:              "some changes that fix #42.\n/assign",
 			hasLabel:            false,
 			files:               []string{"a/a.go"},
-			comments:            []github.IssueComment{newTestComment("Alice", "stuff\n/approve")},
-			reviews:             []github.Review{},
+			comments:            []scallywag.IssueComment{newTestComment("Alice", "stuff\n/approve")},
+			reviews:             []scallywag.Review{},
 			selfApprove:         false,
 			needsIssue:          true,
 			lgtmActsAsApprove:   false,
@@ -328,11 +329,11 @@ Approvers can cancel approval by writing ` + "`/approve cancel`" + ` in a commen
 			name:     "non-implicit self approve no-issue",
 			hasLabel: false,
 			files:    []string{"a/a.go", "c/c.go"},
-			comments: []github.IssueComment{
+			comments: []scallywag.IssueComment{
 				newTestComment("ALIcE", "stuff\n/approve"),
 				newTestComment("cjwagner", "stuff\n/approve no-issue"),
 			},
-			reviews:             []github.Review{},
+			reviews:             []scallywag.Review{},
 			selfApprove:         false,
 			needsIssue:          true,
 			lgtmActsAsApprove:   false,
@@ -348,7 +349,7 @@ Approvers can cancel approval by writing ` + "`/approve cancel`" + ` in a commen
 			name:     "implicit self approve, missing issue",
 			hasLabel: false,
 			files:    []string{"a/a.go", "c/c.go"},
-			comments: []github.IssueComment{
+			comments: []scallywag.IssueComment{
 				newTestComment("ALIcE", "stuff\n/approve"),
 				newTestCommentTime(time.Now(), "k8s-ci-robot", `[APPROVALNOTIFIER] This PR is **NOT APPROVED**
 
@@ -371,7 +372,7 @@ Approvers can cancel approval by writing `+"`/approve cancel`"+` in a comment
 </details>
 <!-- META={"approvers":[]} -->`),
 			},
-			reviews:             []github.Review{},
+			reviews:             []scallywag.Review{},
 			selfApprove:         true,
 			needsIssue:          true,
 			lgtmActsAsApprove:   false,
@@ -386,12 +387,12 @@ Approvers can cancel approval by writing `+"`/approve cancel`"+` in a comment
 			name:     "remove approval with /approve cancel",
 			hasLabel: true,
 			files:    []string{"a/a.go"},
-			comments: []github.IssueComment{
+			comments: []scallywag.IssueComment{
 				newTestComment("Alice", "/approve no-issue"),
 				newTestComment("k8s-ci-robot", "[APPROVALNOTIFIER] This PR is **APPROVED**\n\nblah"),
 				newTestComment("Alice", "stuff\n/approve cancel \nmore stuff"),
 			},
-			reviews:             []github.Review{},
+			reviews:             []scallywag.Review{},
 			selfApprove:         true, // no-op test
 			needsIssue:          true,
 			lgtmActsAsApprove:   false,
@@ -430,11 +431,11 @@ Approvers can cancel approval by writing ` + "`/approve cancel`" + ` in a commen
 			prBody:   "Changes the thing.\n fixes #42",
 			hasLabel: true,
 			files:    []string{"a/a.go", "b/b.go"},
-			comments: []github.IssueComment{
+			comments: []scallywag.IssueComment{
 				newTestComment("bOb", "stuff\n/approve \nblah"),
 				newTestComment("k8s-ci-robot", "[APPROVALNOTIFIER] This PR is **APPROVED**\n\nblah"),
 			},
-			reviews:             []github.Review{},
+			reviews:             []scallywag.Review{},
 			selfApprove:         true, // no-op test
 			needsIssue:          false,
 			lgtmActsAsApprove:   false,
@@ -450,11 +451,11 @@ Approvers can cancel approval by writing ` + "`/approve cancel`" + ` in a commen
 			prBody:   "Changes the thing.\n fixes #42",
 			hasLabel: true,
 			files:    []string{"c/c.go"},
-			comments: []github.IssueComment{
+			comments: []scallywag.IssueComment{
 				newTestComment("k8s-ci-robot", "[APPROVALNOTIFIER] This PR is **APPROVED**\n\nblah"),
 				newTestCommentTime(time.Now(), "CJWagner", "stuff\n/approve cancel \nmore stuff"),
 			},
-			reviews:             []github.Review{},
+			reviews:             []scallywag.Review{},
 			selfApprove:         true,
 			needsIssue:          true,
 			lgtmActsAsApprove:   false,
@@ -470,11 +471,11 @@ Approvers can cancel approval by writing ` + "`/approve cancel`" + ` in a commen
 			prBody:   "Changes the thing.\n fixes #42",
 			hasLabel: true,
 			files:    []string{"c/c.go"},
-			comments: []github.IssueComment{
+			comments: []scallywag.IssueComment{
 				newTestComment("k8s-ci-robot", "[APPROVALNOTIFIER] This PR is **APPROVED**\n\nblah"),
 				newTestCommentTime(time.Now(), "CJWagner", "/lgtm cancel //PR changed after LGTM, removing LGTM."),
 			},
-			reviews:             []github.Review{},
+			reviews:             []scallywag.Review{},
 			selfApprove:         true,
 			needsIssue:          true,
 			lgtmActsAsApprove:   true,
@@ -490,7 +491,7 @@ Approvers can cancel approval by writing ` + "`/approve cancel`" + ` in a commen
 			prBody:   "Finally fixes kubernetes/kubernetes#1\n",
 			hasLabel: true,
 			files:    []string{"a/a.go", "a/aa.go"},
-			comments: []github.IssueComment{
+			comments: []scallywag.IssueComment{
 				newTestComment("alice", "stuff\n/approve\nblah"),
 				newTestCommentTime(time.Now(), "k8s-ci-robot", `[APPROVALNOTIFIER] This PR is **APPROVED**
 
@@ -512,7 +513,7 @@ Approvers can cancel approval by writing `+"`/approve cancel`"+` in a comment
 </details>
 <!-- META={"approvers":[]} -->`),
 			},
-			reviews:             []github.Review{},
+			reviews:             []scallywag.Review{},
 			selfApprove:         false,
 			needsIssue:          true,
 			lgtmActsAsApprove:   false,
@@ -528,11 +529,11 @@ Approvers can cancel approval by writing `+"`/approve cancel`"+` in a comment
 			prBody:   "Finally fixes kubernetes/kubernetes#1\n",
 			hasLabel: false,
 			files:    []string{"a/a.go", "a/aa.go"}, // previous commits may have been ["b/b.go"]
-			comments: []github.IssueComment{
+			comments: []scallywag.IssueComment{
 				newTestComment("alice", "stuff\n/approve\nblah"),
 				newTestCommentTime(time.Now(), "k8s-ci-robot", "[APPROVALNOTIFIER] This PR is **NOT APPROVED**\n\nblah"),
 			},
-			reviews:             []github.Review{},
+			reviews:             []scallywag.Review{},
 			selfApprove:         false,
 			needsIssue:          true,
 			lgtmActsAsApprove:   false,
@@ -548,10 +549,10 @@ Approvers can cancel approval by writing `+"`/approve cancel`"+` in a comment
 			hasLabel:      true,
 			humanApproved: true,
 			files:         []string{"a/a.go"},
-			comments: []github.IssueComment{
+			comments: []scallywag.IssueComment{
 				newTestComment("k8s-ci-robot", "[APPROVALNOTIFIER] This PR is **NOT APPROVED**\n\nblah"),
 			},
-			reviews:             []github.Review{},
+			reviews:             []scallywag.Review{},
 			selfApprove:         false,
 			needsIssue:          false,
 			lgtmActsAsApprove:   false,
@@ -586,11 +587,11 @@ Approvers can cancel approval by writing ` + "`/approve cancel`" + ` in a commen
 			prBody:   "This is a great PR that will fix\nlots of things!",
 			hasLabel: false,
 			files:    []string{"a/a.go", "a/aa.go"},
-			comments: []github.IssueComment{
+			comments: []scallywag.IssueComment{
 				newTestComment("k8s-ci-robot", "[APPROVALNOTIFIER] This PR is **NOT APPROVED**\n\nblah"),
 				newTestCommentTime(time.Now(), "alice", "stuff\n/lgtm\nblah"),
 			},
-			reviews:             []github.Review{},
+			reviews:             []scallywag.Review{},
 			selfApprove:         false,
 			needsIssue:          false,
 			lgtmActsAsApprove:   true,
@@ -606,7 +607,7 @@ Approvers can cancel approval by writing ` + "`/approve cancel`" + ` in a commen
 			prBody:   "This is a great PR that will fix\nlots of things!",
 			hasLabel: false,
 			files:    []string{"a/a.go", "a/aa.go"},
-			comments: []github.IssueComment{
+			comments: []scallywag.IssueComment{
 				newTestComment("k8s-ci-robot", `[APPROVALNOTIFIER] This PR is **NOT APPROVED**
 
 This pull-request has been approved by:
@@ -630,7 +631,7 @@ Approvers can cancel approval by writing `+"`/approve cancel`"+` in a comment
 <!-- META={"approvers":["alice"]} -->`),
 				newTestCommentTime(time.Now(), "alice", "stuff\n/lgtm\nblah"),
 			},
-			reviews:             []github.Review{},
+			reviews:             []scallywag.Review{},
 			selfApprove:         false,
 			needsIssue:          false,
 			lgtmActsAsApprove:   false,
@@ -645,8 +646,8 @@ Approvers can cancel approval by writing `+"`/approve cancel`"+` in a comment
 			name:                "approve in review body with empty state",
 			hasLabel:            false,
 			files:               []string{"a/a.go"},
-			comments:            []github.IssueComment{},
-			reviews:             []github.Review{newTestReview("Alice", "stuff\n/approve", "")},
+			comments:            []scallywag.IssueComment{},
+			reviews:             []scallywag.Review{newTestReview("Alice", "stuff\n/approve", "")},
 			selfApprove:         false,
 			needsIssue:          false,
 			lgtmActsAsApprove:   false,
@@ -678,8 +679,8 @@ Approvers can cancel approval by writing ` + "`/approve cancel`" + ` in a commen
 			name:                "approved review but reviewActsAsApprove disabled",
 			hasLabel:            false,
 			files:               []string{"c/c.go"},
-			comments:            []github.IssueComment{},
-			reviews:             []github.Review{newTestReview("cjwagner", "stuff", github.ReviewStateApproved)},
+			comments:            []scallywag.IssueComment{},
+			reviews:             []scallywag.Review{newTestReview("cjwagner", "stuff", scallywag.ReviewStateApproved)},
 			selfApprove:         false,
 			needsIssue:          false,
 			lgtmActsAsApprove:   false,
@@ -715,8 +716,8 @@ Approvers can cancel approval by writing ` + "`/approve cancel`" + ` in a commen
 			name:                "approved review with reviewActsAsApprove enabled",
 			hasLabel:            false,
 			files:               []string{"a/a.go"},
-			comments:            []github.IssueComment{},
-			reviews:             []github.Review{newTestReview("Alice", "stuff", github.ReviewStateApproved)},
+			comments:            []scallywag.IssueComment{},
+			reviews:             []scallywag.Review{newTestReview("Alice", "stuff", scallywag.ReviewStateApproved)},
 			selfApprove:         false,
 			needsIssue:          false,
 			lgtmActsAsApprove:   false,
@@ -748,8 +749,8 @@ Approvers can cancel approval by writing ` + "`/approve cancel`" + ` in a commen
 			name:     "reviews in non-approving state (should not approve)",
 			hasLabel: false,
 			files:    []string{"c/c.go"},
-			comments: []github.IssueComment{},
-			reviews: []github.Review{
+			comments: []scallywag.IssueComment{},
+			reviews: []scallywag.Review{
 				newTestReview("cjwagner", "stuff", "COMMENTED"),
 				newTestReview("cjwagner", "unsubmitted stuff", "PENDING"),
 				newTestReview("cjwagner", "dismissed stuff", "DISMISSED"),
@@ -789,12 +790,12 @@ Approvers can cancel approval by writing ` + "`/approve cancel`" + ` in a commen
 			name:     "review in request changes state means cancel",
 			hasLabel: true,
 			files:    []string{"c/c.go"},
-			comments: []github.IssueComment{
+			comments: []scallywag.IssueComment{
 				newTestCommentTime(time.Now().Add(time.Hour), "k8s-ci-robot", "[APPROVALNOTIFIER] This PR is **APPROVED**\n\nblah"), // second
 			},
-			reviews: []github.Review{
-				newTestReviewTime(time.Now(), "cjwagner", "yep", github.ReviewStateApproved),                           // first
-				newTestReviewTime(time.Now().Add(time.Hour*2), "cjwagner", "nope", github.ReviewStateChangesRequested), // third
+			reviews: []scallywag.Review{
+				newTestReviewTime(time.Now(), "cjwagner", "yep", scallywag.ReviewStateApproved),                           // first
+				newTestReviewTime(time.Now().Add(time.Hour*2), "cjwagner", "nope", scallywag.ReviewStateChangesRequested), // third
 			},
 			selfApprove:         false,
 			needsIssue:          false,
@@ -831,12 +832,12 @@ Approvers can cancel approval by writing ` + "`/approve cancel`" + ` in a commen
 			name:     "dismissed review doesn't cancel prior approval",
 			hasLabel: true,
 			files:    []string{"a/a.go"},
-			comments: []github.IssueComment{
+			comments: []scallywag.IssueComment{
 				newTestCommentTime(time.Now().Add(time.Hour), "k8s-ci-robot", "[APPROVALNOTIFIER] This PR is **APPROVED**\n\nblah"), // second
 			},
-			reviews: []github.Review{
-				newTestReviewTime(time.Now(), "Alice", "yep", github.ReviewStateApproved),                         // first
-				newTestReviewTime(time.Now().Add(time.Hour*2), "Alice", "dismissed", github.ReviewStateDismissed), // third
+			reviews: []scallywag.Review{
+				newTestReviewTime(time.Now(), "Alice", "yep", scallywag.ReviewStateApproved),                         // first
+				newTestReviewTime(time.Now().Add(time.Hour*2), "Alice", "dismissed", scallywag.ReviewStateDismissed), // third
 			},
 			selfApprove:         false,
 			needsIssue:          false,
@@ -869,12 +870,12 @@ Approvers can cancel approval by writing ` + "`/approve cancel`" + ` in a commen
 			name:     "approve cancel command supersedes earlier approved review",
 			hasLabel: true,
 			files:    []string{"c/c.go"},
-			comments: []github.IssueComment{
+			comments: []scallywag.IssueComment{
 				newTestCommentTime(time.Now().Add(time.Hour), "k8s-ci-robot", "[APPROVALNOTIFIER] This PR is **APPROVED**\n\nblah"), // second
 				newTestCommentTime(time.Now().Add(time.Hour*2), "cjwagner", "stuff\n/approve cancel \nmore stuff"),                  // third
 			},
-			reviews: []github.Review{
-				newTestReviewTime(time.Now(), "cjwagner", "yep", github.ReviewStateApproved), // first
+			reviews: []scallywag.Review{
+				newTestReviewTime(time.Now(), "cjwagner", "yep", scallywag.ReviewStateApproved), // first
 			},
 			selfApprove:         false,
 			needsIssue:          false,
@@ -911,9 +912,9 @@ Approvers can cancel approval by writing ` + "`/approve cancel`" + ` in a commen
 			name:     "approve cancel command supersedes simultaneous approved review",
 			hasLabel: false,
 			files:    []string{"c/c.go"},
-			comments: []github.IssueComment{},
-			reviews: []github.Review{
-				newTestReview("cjwagner", "/approve cancel", github.ReviewStateApproved),
+			comments: []scallywag.IssueComment{},
+			reviews: []scallywag.Review{
+				newTestReview("cjwagner", "/approve cancel", scallywag.ReviewStateApproved),
 			},
 			selfApprove:         false,
 			needsIssue:          false,
@@ -950,8 +951,8 @@ Approvers can cancel approval by writing ` + "`/approve cancel`" + ` in a commen
 			name:                "approve command supersedes simultaneous changes requested review",
 			hasLabel:            false,
 			files:               []string{"a/a.go"},
-			comments:            []github.IssueComment{},
-			reviews:             []github.Review{newTestReview("Alice", "/approve", github.ReviewStateChangesRequested)},
+			comments:            []scallywag.IssueComment{},
+			reviews:             []scallywag.Review{newTestReview("Alice", "/approve", scallywag.ReviewStateChangesRequested)},
 			selfApprove:         false,
 			needsIssue:          false,
 			lgtmActsAsApprove:   false,
@@ -984,8 +985,8 @@ Approvers can cancel approval by writing ` + "`/approve cancel`" + ` in a commen
 			branch:              "dev",
 			hasLabel:            false,
 			files:               []string{"c/c.go"},
-			comments:            []github.IssueComment{},
-			reviews:             []github.Review{},
+			comments:            []scallywag.IssueComment{},
+			reviews:             []scallywag.Review{},
 			selfApprove:         true,
 			needsIssue:          false,
 			lgtmActsAsApprove:   false,
@@ -1018,8 +1019,8 @@ Approvers can cancel approval by writing ` + "`/approve cancel`" + ` in a commen
 			branch:              "dev",
 			hasLabel:            false,
 			files:               []string{"c/c.go"},
-			comments:            []github.IssueComment{},
-			reviews:             []github.Review{},
+			comments:            []scallywag.IssueComment{},
+			reviews:             []scallywag.Review{},
 			selfApprove:         true,
 			needsIssue:          false,
 			lgtmActsAsApprove:   false,
@@ -1098,7 +1099,7 @@ Approvers can cancel approval by writing ` + "`/approve cancel`" + ` in a commen
 				number:    prNumber,
 				body:      test.prBody,
 				author:    "cjwagner",
-				assignees: []github.User{{Login: "spxtr"}},
+				assignees: []scallywag.User{{Login: "spxtr"}},
 			},
 		); err != nil {
 			t.Errorf("[%s] Unexpected error handling event: %v.", test.name, err)
@@ -1214,23 +1215,23 @@ func (fro fakeRepoOwners) RequiredReviewers(path string) sets.String {
 func TestHandleGenericComment(t *testing.T) {
 	tests := []struct {
 		name              string
-		commentEvent      github.GenericCommentEvent
+		commentEvent      scallywag.GenericCommentEvent
 		lgtmActsAsApprove bool
 		expectHandle      bool
 		expectState       *state
 	}{
 		{
 			name: "valid approve command",
-			commentEvent: github.GenericCommentEvent{
-				Action: github.GenericCommentActionCreated,
+			commentEvent: scallywag.GenericCommentEvent{
+				Action: scallywag.GenericCommentActionCreated,
 				IsPR:   true,
 				Body:   "/approve",
 				Number: 1,
-				User: github.User{
+				User: scallywag.User{
 					Login: "author",
 				},
 				IssueBody: "Fix everything",
-				IssueAuthor: github.User{
+				IssueAuthor: scallywag.User{
 					Login: "P.R. Author",
 				},
 			},
@@ -1248,12 +1249,12 @@ func TestHandleGenericComment(t *testing.T) {
 		},
 		{
 			name: "not comment created",
-			commentEvent: github.GenericCommentEvent{
-				Action: github.GenericCommentActionEdited,
+			commentEvent: scallywag.GenericCommentEvent{
+				Action: scallywag.GenericCommentActionEdited,
 				IsPR:   true,
 				Body:   "/approve",
 				Number: 1,
-				User: github.User{
+				User: scallywag.User{
 					Login: "author",
 				},
 			},
@@ -1261,12 +1262,12 @@ func TestHandleGenericComment(t *testing.T) {
 		},
 		{
 			name: "not PR",
-			commentEvent: github.GenericCommentEvent{
-				Action: github.GenericCommentActionEdited,
+			commentEvent: scallywag.GenericCommentEvent{
+				Action: scallywag.GenericCommentActionEdited,
 				IsPR:   false,
 				Body:   "/approve",
 				Number: 1,
-				User: github.User{
+				User: scallywag.User{
 					Login: "author",
 				},
 			},
@@ -1274,12 +1275,12 @@ func TestHandleGenericComment(t *testing.T) {
 		},
 		{
 			name: "closed PR",
-			commentEvent: github.GenericCommentEvent{
-				Action: github.GenericCommentActionCreated,
+			commentEvent: scallywag.GenericCommentEvent{
+				Action: scallywag.GenericCommentActionCreated,
 				IsPR:   true,
 				Body:   "/approve",
 				Number: 1,
-				User: github.User{
+				User: scallywag.User{
 					Login: "author",
 				},
 				IssueState: "closed",
@@ -1288,12 +1289,12 @@ func TestHandleGenericComment(t *testing.T) {
 		},
 		{
 			name: "no approve command",
-			commentEvent: github.GenericCommentEvent{
-				Action: github.GenericCommentActionCreated,
+			commentEvent: scallywag.GenericCommentEvent{
+				Action: scallywag.GenericCommentActionCreated,
 				IsPR:   true,
 				Body:   "stuff",
 				Number: 1,
-				User: github.User{
+				User: scallywag.User{
 					Login: "author",
 				},
 			},
@@ -1301,12 +1302,12 @@ func TestHandleGenericComment(t *testing.T) {
 		},
 		{
 			name: "lgtm without lgtmActsAsApprove",
-			commentEvent: github.GenericCommentEvent{
-				Action: github.GenericCommentActionCreated,
+			commentEvent: scallywag.GenericCommentEvent{
+				Action: scallywag.GenericCommentActionCreated,
 				IsPR:   true,
 				Body:   "/lgtm",
 				Number: 1,
-				User: github.User{
+				User: scallywag.User{
 					Login: "author",
 				},
 			},
@@ -1314,12 +1315,12 @@ func TestHandleGenericComment(t *testing.T) {
 		},
 		{
 			name: "lgtm with lgtmActsAsApprove",
-			commentEvent: github.GenericCommentEvent{
-				Action: github.GenericCommentActionCreated,
+			commentEvent: scallywag.GenericCommentEvent{
+				Action: scallywag.GenericCommentActionCreated,
 				IsPR:   true,
 				Body:   "/lgtm",
 				Number: 1,
-				User: github.User{
+				User: scallywag.User{
 					Login: "author",
 				},
 			},
@@ -1339,20 +1340,20 @@ func TestHandleGenericComment(t *testing.T) {
 		handleFunc = handle
 	}()
 
-	repo := github.Repo{
-		Owner: github.User{
+	repo := scallywag.Repo{
+		Owner: scallywag.User{
 			Login: "org",
 		},
 		Name: "repo",
 	}
-	pr := github.PullRequest{
-		Base: github.PullRequestBranch{
+	pr := scallywag.PullRequest{
+		Base: scallywag.PullRequestBranch{
 			Ref: "branch",
 		},
 		Number: 1,
 	}
 	fghc := &fakegithub.FakeClient{
-		PullRequests: map[int]*github.PullRequest{1: &pr},
+		PullRequests: map[int]*scallywag.PullRequest{1: &pr},
 	}
 
 	for _, test := range tests {
@@ -1397,14 +1398,14 @@ func TestHandleGenericComment(t *testing.T) {
 }
 
 // GitHub webhooks send state as lowercase, so force it to lowercase here.
-func stateToLower(s github.ReviewState) github.ReviewState {
-	return github.ReviewState(strings.ToLower(string(s)))
+func stateToLower(s scallywag.ReviewState) scallywag.ReviewState {
+	return scallywag.ReviewState(strings.ToLower(string(s)))
 }
 
 func TestHandleReview(t *testing.T) {
 	tests := []struct {
 		name                string
-		reviewEvent         github.ReviewEvent
+		reviewEvent         scallywag.ReviewEvent
 		lgtmActsAsApprove   bool
 		reviewActsAsApprove bool
 		expectHandle        bool
@@ -1412,14 +1413,14 @@ func TestHandleReview(t *testing.T) {
 	}{
 		{
 			name: "approved state",
-			reviewEvent: github.ReviewEvent{
-				Action: github.ReviewActionSubmitted,
-				Review: github.Review{
+			reviewEvent: scallywag.ReviewEvent{
+				Action: scallywag.ReviewActionSubmitted,
+				Review: scallywag.Review{
 					Body: "looks good",
-					User: github.User{
+					User: scallywag.User{
 						Login: "author",
 					},
-					State: stateToLower(github.ReviewStateApproved),
+					State: stateToLower(scallywag.ReviewStateApproved),
 				},
 			},
 			reviewActsAsApprove: true,
@@ -1437,14 +1438,14 @@ func TestHandleReview(t *testing.T) {
 		},
 		{
 			name: "changes requested state",
-			reviewEvent: github.ReviewEvent{
-				Action: github.ReviewActionSubmitted,
-				Review: github.Review{
+			reviewEvent: scallywag.ReviewEvent{
+				Action: scallywag.ReviewActionSubmitted,
+				Review: scallywag.Review{
 					Body: "looks bad",
-					User: github.User{
+					User: scallywag.User{
 						Login: "author",
 					},
-					State: stateToLower(github.ReviewStateChangesRequested),
+					State: stateToLower(scallywag.ReviewStateChangesRequested),
 				},
 			},
 			reviewActsAsApprove: true,
@@ -1452,14 +1453,14 @@ func TestHandleReview(t *testing.T) {
 		},
 		{
 			name: "pending review state",
-			reviewEvent: github.ReviewEvent{
-				Action: github.ReviewActionSubmitted,
-				Review: github.Review{
+			reviewEvent: scallywag.ReviewEvent{
+				Action: scallywag.ReviewActionSubmitted,
+				Review: scallywag.Review{
 					Body: "looks good",
-					User: github.User{
+					User: scallywag.User{
 						Login: "author",
 					},
-					State: stateToLower(github.ReviewStatePending),
+					State: stateToLower(scallywag.ReviewStatePending),
 				},
 			},
 			reviewActsAsApprove: true,
@@ -1467,14 +1468,14 @@ func TestHandleReview(t *testing.T) {
 		},
 		{
 			name: "edited review",
-			reviewEvent: github.ReviewEvent{
-				Action: github.ReviewActionEdited,
-				Review: github.Review{
+			reviewEvent: scallywag.ReviewEvent{
+				Action: scallywag.ReviewActionEdited,
+				Review: scallywag.Review{
 					Body: "looks good",
-					User: github.User{
+					User: scallywag.User{
 						Login: "author",
 					},
-					State: stateToLower(github.ReviewStateApproved),
+					State: stateToLower(scallywag.ReviewStateApproved),
 				},
 			},
 			reviewActsAsApprove: true,
@@ -1482,14 +1483,14 @@ func TestHandleReview(t *testing.T) {
 		},
 		{
 			name: "dismissed review",
-			reviewEvent: github.ReviewEvent{
-				Action: github.ReviewActionDismissed,
-				Review: github.Review{
+			reviewEvent: scallywag.ReviewEvent{
+				Action: scallywag.ReviewActionDismissed,
+				Review: scallywag.Review{
 					Body: "looks good",
-					User: github.User{
+					User: scallywag.User{
 						Login: "author",
 					},
-					State: stateToLower(github.ReviewStateDismissed),
+					State: stateToLower(scallywag.ReviewStateDismissed),
 				},
 			},
 			reviewActsAsApprove: true,
@@ -1497,14 +1498,14 @@ func TestHandleReview(t *testing.T) {
 		},
 		{
 			name: "approve command",
-			reviewEvent: github.ReviewEvent{
-				Action: github.ReviewActionSubmitted,
-				Review: github.Review{
+			reviewEvent: scallywag.ReviewEvent{
+				Action: scallywag.ReviewActionSubmitted,
+				Review: scallywag.Review{
 					Body: "/approve",
-					User: github.User{
+					User: scallywag.User{
 						Login: "author",
 					},
-					State: stateToLower(github.ReviewStateApproved),
+					State: stateToLower(scallywag.ReviewStateApproved),
 				},
 			},
 			reviewActsAsApprove: true,
@@ -1512,14 +1513,14 @@ func TestHandleReview(t *testing.T) {
 		},
 		{
 			name: "lgtm command",
-			reviewEvent: github.ReviewEvent{
-				Action: github.ReviewActionSubmitted,
-				Review: github.Review{
+			reviewEvent: scallywag.ReviewEvent{
+				Action: scallywag.ReviewActionSubmitted,
+				Review: scallywag.Review{
 					Body: "/lgtm",
-					User: github.User{
+					User: scallywag.User{
 						Login: "author",
 					},
-					State: stateToLower(github.ReviewStateApproved),
+					State: stateToLower(scallywag.ReviewStateApproved),
 				},
 			},
 			lgtmActsAsApprove:   true,
@@ -1528,14 +1529,14 @@ func TestHandleReview(t *testing.T) {
 		},
 		{
 			name: "feature disabled",
-			reviewEvent: github.ReviewEvent{
-				Action: github.ReviewActionSubmitted,
-				Review: github.Review{
+			reviewEvent: scallywag.ReviewEvent{
+				Action: scallywag.ReviewActionSubmitted,
+				Review: scallywag.Review{
 					Body: "looks good",
-					User: github.User{
+					User: scallywag.User{
 						Login: "author",
 					},
-					State: stateToLower(github.ReviewStateApproved),
+					State: stateToLower(scallywag.ReviewStateApproved),
 				},
 			},
 			reviewActsAsApprove: false,
@@ -1554,24 +1555,24 @@ func TestHandleReview(t *testing.T) {
 		handleFunc = handle
 	}()
 
-	repo := github.Repo{
-		Owner: github.User{
+	repo := scallywag.Repo{
+		Owner: scallywag.User{
 			Login: "org",
 		},
 		Name: "repo",
 	}
-	pr := github.PullRequest{
-		User: github.User{
+	pr := scallywag.PullRequest{
+		User: scallywag.User{
 			Login: "P.R. Author",
 		},
-		Base: github.PullRequestBranch{
+		Base: scallywag.PullRequestBranch{
 			Ref: "branch",
 		},
 		Number: 1,
 		Body:   "Fix everything",
 	}
 	fghc := &fakegithub.FakeClient{
-		PullRequests: map[int]*github.PullRequest{1: &pr},
+		PullRequests: map[int]*scallywag.PullRequest{1: &pr},
 	}
 
 	for _, test := range tests {
@@ -1621,19 +1622,19 @@ func TestHandleReview(t *testing.T) {
 func TestHandlePullRequest(t *testing.T) {
 	tests := []struct {
 		name         string
-		prEvent      github.PullRequestEvent
+		prEvent      scallywag.PullRequestEvent
 		expectHandle bool
 		expectState  *state
 	}{
 		{
 			name: "pr opened",
-			prEvent: github.PullRequestEvent{
-				Action: github.PullRequestActionOpened,
-				PullRequest: github.PullRequest{
-					User: github.User{
+			prEvent: scallywag.PullRequestEvent{
+				Action: scallywag.PullRequestActionOpened,
+				PullRequest: scallywag.PullRequest{
+					User: scallywag.User{
 						Login: "P.R. Author",
 					},
-					Base: github.PullRequestBranch{
+					Base: scallywag.PullRequestBranch{
 						Ref: "branch",
 					},
 					Body: "Fix everything",
@@ -1654,23 +1655,23 @@ func TestHandlePullRequest(t *testing.T) {
 		},
 		{
 			name: "pr reopened",
-			prEvent: github.PullRequestEvent{
-				Action: github.PullRequestActionReopened,
+			prEvent: scallywag.PullRequestEvent{
+				Action: scallywag.PullRequestActionReopened,
 			},
 			expectHandle: true,
 		},
 		{
 			name: "pr sync",
-			prEvent: github.PullRequestEvent{
-				Action: github.PullRequestActionSynchronize,
+			prEvent: scallywag.PullRequestEvent{
+				Action: scallywag.PullRequestActionSynchronize,
 			},
 			expectHandle: true,
 		},
 		{
 			name: "pr labeled",
-			prEvent: github.PullRequestEvent{
-				Action: github.PullRequestActionLabeled,
-				Label: github.Label{
+			prEvent: scallywag.PullRequestEvent{
+				Action: scallywag.PullRequestActionLabeled,
+				Label: scallywag.Label{
 					Name: labels.Approved,
 				},
 			},
@@ -1678,9 +1679,9 @@ func TestHandlePullRequest(t *testing.T) {
 		},
 		{
 			name: "pr another label",
-			prEvent: github.PullRequestEvent{
-				Action: github.PullRequestActionLabeled,
-				Label: github.Label{
+			prEvent: scallywag.PullRequestEvent{
+				Action: scallywag.PullRequestActionLabeled,
+				Label: scallywag.Label{
 					Name: "some-label",
 				},
 			},
@@ -1688,12 +1689,12 @@ func TestHandlePullRequest(t *testing.T) {
 		},
 		{
 			name: "pr closed",
-			prEvent: github.PullRequestEvent{
-				Action: github.PullRequestActionLabeled,
-				Label: github.Label{
+			prEvent: scallywag.PullRequestEvent{
+				Action: scallywag.PullRequestActionLabeled,
+				Label: scallywag.Label{
 					Name: labels.Approved,
 				},
-				PullRequest: github.PullRequest{
+				PullRequest: scallywag.PullRequest{
 					State: "closed",
 				},
 			},
@@ -1701,8 +1702,8 @@ func TestHandlePullRequest(t *testing.T) {
 		},
 		{
 			name: "pr review requested",
-			prEvent: github.PullRequestEvent{
-				Action: github.PullRequestActionReviewRequested,
+			prEvent: scallywag.PullRequestEvent{
+				Action: scallywag.PullRequestActionReviewRequested,
 			},
 			expectHandle: false,
 		},
@@ -1719,8 +1720,8 @@ func TestHandlePullRequest(t *testing.T) {
 		handleFunc = handle
 	}()
 
-	repo := github.Repo{
-		Owner: github.User{
+	repo := scallywag.Repo{
+		Owner: scallywag.User{
 			Login: "org",
 		},
 		Name: "repo",

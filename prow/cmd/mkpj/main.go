@@ -30,8 +30,8 @@ import (
 	"k8s.io/test-infra/prow/config"
 	"k8s.io/test-infra/prow/config/secret"
 	prowflagutil "k8s.io/test-infra/prow/flagutil"
-	"k8s.io/test-infra/prow/github"
 	"k8s.io/test-infra/prow/pjutil"
+	"k8s.io/test-infra/prow/scallywag"
 )
 
 type options struct {
@@ -49,10 +49,10 @@ type options struct {
 
 	github       prowflagutil.GitHubOptions
 	githubClient githubClient
-	pullRequest  *github.PullRequest
+	pullRequest  *scallywag.PullRequest
 }
 
-func (o *options) getPullRequest() (*github.PullRequest, error) {
+func (o *options) getPullRequest() (*scallywag.PullRequest, error) {
 	if o.pullRequest != nil {
 		return o.pullRequest, nil
 	}
@@ -122,7 +122,7 @@ func (o *options) defaultBaseRef(pjs *prowapi.ProwJobSpec) error {
 }
 
 type githubClient interface {
-	GetPullRequest(org, repo string, number int) (*github.PullRequest, error)
+	GetPullRequest(org, repo string, number int) (*scallywag.PullRequest, error)
 	GetRef(org, repo, ref string) (string, error)
 }
 

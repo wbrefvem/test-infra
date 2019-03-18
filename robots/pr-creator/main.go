@@ -119,7 +119,7 @@ func main() {
 type updateClient interface {
 	UpdatePullRequest(org, repo string, number int, title, body *string, open *bool, branch *string, canModify *bool) error
 	BotName() (string, error)
-	FindIssues(query, sort string, asc bool) ([]github.Issue, error)
+	FindIssues(query, sort string, asc bool) ([]scallywag.Issue, error)
 }
 
 func updatePR(o options, gc updateClient) (*int, error) {

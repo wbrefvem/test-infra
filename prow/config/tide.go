@@ -26,7 +26,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/test-infra/prow/github"
+	"k8s.io/test-infra/prow/scallywag"
 )
 
 // TideQueries is a TideQuery slice.
@@ -79,7 +79,7 @@ type Tide struct {
 
 	// A key/value pair of an org/repo as the key and merge method to override
 	// the default method of merge. Valid options are squash, rebase, and merge.
-	MergeType map[string]github.PullRequestMergeType `json:"merge_method,omitempty"`
+	MergeType map[string]scallywag.PullRequestMergeType `json:"merge_method,omitempty"`
 
 	// URL for tide status contexts.
 	// We can consider allowing this to be set separately for separate repos, or
@@ -115,7 +115,7 @@ type Tide struct {
 
 // MergeMethod returns the merge method to use for a repo. The default of merge is
 // returned when not overridden.
-func (t *Tide) MergeMethod(org, repo string) github.PullRequestMergeType {
+func (t *Tide) MergeMethod(org, repo string) scallywag.PullRequestMergeType {
 	name := org + "/" + repo
 
 	v, ok := t.MergeType[name]
@@ -124,7 +124,7 @@ func (t *Tide) MergeMethod(org, repo string) github.PullRequestMergeType {
 			return ov
 		}
 
-		return github.MergeMerge
+		return scallywag.MergeMerge
 	}
 
 	return v
