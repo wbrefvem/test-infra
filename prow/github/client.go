@@ -39,6 +39,7 @@ import (
 	"golang.org/x/oauth2"
 
 	"k8s.io/test-infra/ghproxy/ghcache"
+	"k8s.io/test-infra/prow/config"
 	"k8s.io/test-infra/prow/errorutil"
 	"k8s.io/test-infra/prow/scallywag"
 )
@@ -228,28 +229,40 @@ func (c *Client) Throttle(hourlyTokens, burst int) {
 // NewClientWithFields creates a new fully operational GitHub client. With
 // added logging fields.
 // 'getToken' is a generator for the GitHub access token to use.
+// 'configAgent' is a started config agent.
 // 'bases' is a variadic slice of endpoints to use in order of preference.
 //   An endpoint is used when all preceding endpoints have returned a conn err.
 //   This should be used when using the ghproxy GitHub proxy cache to allow
 //   this client to bypass the cache if it is temporarily unavailable.
-func NewClientWithFields(fields logrus.Fields, getToken func() []byte, bases ...string) *Client {
-	return &Client{
-		logger: logrus.WithFields(fields).WithField("client", "github"),
-		time:   &standardTime{},
-		gqlc: githubql.NewClient(&http.Client{
-			Timeout:   maxRequestTime,
-			Transport: &oauth2.Transport{Source: newReloadingTokenSource(getToken)},
-		}),
-		client:   &http.Client{Timeout: maxRequestTime},
-		bases:    bases,
-		getToken: getToken,
-		dry:      false,
+func NewClientWithFields(fields logrus.Fields, getToken func() []byte, configAgent *config.Agent, bases ...string) scallywag.Client {
+	c := configAgent.Config()
+
+	if c.Scallywag.IsNotGitHub {
+		return NewScallywagClient()
+	} else {
+		return &Client{
+			logger: logrus.WithFields(fields).WithField("client", "github"),
+			time:   &standardTime{},
+			gqlc: githubql.NewClient(&http.Client{
+				Timeout:   maxRequestTime,
+				Transport: &oauth2.Transport{Source: newReloadingTokenSource(getToken)},
+			}),
+			client:   &http.Client{Timeout: maxRequestTime},
+			bases:    bases,
+			getToken: getToken,
+			dry:      false,
+		}
 	}
+
+}
+
+func NewScallywagClient() scallywag.Client {
+	return nil
 }
 
 // NewClient creates a new fully operational GitHub client.
-func NewClient(getToken func() []byte, bases ...string) *Client {
-	return NewClientWithFields(logrus.Fields{}, getToken, bases...)
+func NewClient(getToken func() []byte, bases ...string) scallywag.Client {
+	return NewClientWithFields(logrus.Fields{}, getToken, &config.Agent{}, bases...)
 }
 
 // NewDryRunClientWithFields creates a new client that will not perform mutating actions
