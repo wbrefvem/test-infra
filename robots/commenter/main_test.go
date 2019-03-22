@@ -19,11 +19,12 @@ package main
 import (
 	"errors"
 	"fmt"
-	"k8s.io/test-infra/prow/github"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
+
+	"k8s.io/test-infra/prow/scallywag"
 )
 
 func TestParseHTMLURL(t *testing.T) {
