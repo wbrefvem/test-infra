@@ -1,204 +1,278 @@
-syntax = "proto3";
+syntax = "proto2";
 
 package scallywag;
 
-message Confirmation {
-
+message Reaction {
+  required string content = 1;
 }
 
-message Provider {
-  string name  = 1;
-  string URL = 2;
-  string token = 3;
-  string type = 4;
+message Status {
+  required string state = 1;
+  optional string targetState = 2;
+  optional string description = 3;
+  optional string context = 4;
 }
 
-message String {
-  string value = 1;
-}
-
-message Branch {
-  string repo = 1;
-  string owner = 2;
-  string name = 3;
-}
-
-message Collaborator {
-  string user = 1;
-  string repo = 2;
-  string org = 3;
-}
-
-message Repository {
-  string name = 1;
-  string HTMLURL = 2;
-  string SSHURL = 3;
-  string CloneURL = 4;
-  bool AllowMergeCommit = 5;
-  string Language = 6;
-  bool Fork = 7;
-  int64 Stars = 8;
-}
-
-message RepositoryInfo {
-	string org = 1;
-	string user = 2;
-	bool isPrivate = 3;
-}
-
-message ForkInfo {
-	string upstreamOwner = 1;
-	string destinationOwner = 2;
-	Repository repo = 3;
-}
-
-message Organization {
-  string name = 1;
+message CombinedStatus {
+  required string sha = 1;
+  repeated Status statuses = 2;
 }
 
 message User {
-  string login = 1;
-  string email = 2;
-  string name = 3;
-  string URL = 4;
-  string AvatarURL = 5;
+  required string login = 1;
+  required string name = 2;
+  required string email = 3;
+  required uint64 ID = 4;
+  required string HTMLURL = 5;
 }
 
-message PullRequest {
-  string Base = 1;
-  string Head = 2;
-  string URL = 3;
-  string Repository = 4;
-  string Owner = 5;
-  int64 Number = 6;
-  bool Mergeable = 7;
-  bool Merged = 8;
-  State State = 9;
-  string StatusesURL = 10;
-  string IssueURL = 11;
-  string DiffURL = 12;
-  string MergeCommitSHA = 13;
-  string CloseAt = 14;
-  string MergedAt = 15;
-  string LastCommitSha = 16;
-  string Title = 17;
-  string Body = 18;
+message Repo {
+  required User owner = 1;
+  required string name = 2;
+  required string fullName = 3;
+  required string HTMLURL = 4;
+  required bool fork = 5;
+  required string defaultBranch = 6;
+  required bool archived = 7;
 }
 
-message PullRequestComment {
-
+message Branch {
+  required string name = 1;
+  required bool protected = 2;
 }
 
-message Webhook {
-  int64 ID = 1;
-  string owner = 2;
-  string repo = 3;
-  string URL = 4;
-  string secret = 5;
+message HookConfig {
+  required string URL = 1;
+  optional string contentType = 2;
+  optional string secret = 3;
 }
 
-message IssueQuery {
-  string query = 1;
+message Hook {
+  required uint64 ID = 1;
+  required string name = 2;
+  repeated string events = 3;
+  required bool active = 4;
+  required HookConfig config = 5;
 }
 
-message Commit {
-  string SHA = 1;
-  string message = 2;
-  User auther = 3;
-  string URL = 4;
-  string branch = 5;
-  User committer = 6;
-  string org = 8;
-  string repo = 9;
+message HookRequest {
+  optional string name = 1;
+  optional bool active = 2;
+  repeated string addEvents = 3;
+  optional HookConfig config = 4;
+  repeated string events = 5;
+  repeated string removeEvents = 6;
 }
 
-message CommitStatus {
-  string SHA = 1;
-  string URL = 2;
-  string state = 3;
-  string name = 4;
-  string description = 5;
-  string CreateOn = 6;
-  string UpdatedOn = 7;
-  string org = 8;
-  string repo = 9;
-}
-
-message FileContent {
-  string Type = 1;
-  string Encoding = 2;
-  int64 Size = 3;
-  string Name = 4;
-  string Path = 5;
-  string Content = 6;
-  string SHA = 7;
-  string URL = 8;
-  string GitURL = 9;
-  string HTMLURL = 10;
-  string DownloadURL = 11;
-}
-
-message Issue {
-  string URL = 1;
-  string owner = 2;
-  string repo = 3;
-  int64 number = 4;
-  string key = 5;
-  string title = 6;
-  string body = 7;
-  State state = 8;
-  repeated Label label = 9;
-  string StatusesURL = 10;
-  string IssueURL = 11;
-  string CreatedAt = 12;
-  string UpdatedAt = 13;
-  string ClosedAt = 14;
-  bool IsPullRequest = 15;
-  User user = 16;
-  User ClosedBy = 17;
-  repeated User assignees = 18;
+message Milestone {
+  required string title = 1;
+  required uint64 number = 2;
 }
 
 message Label {
-  string URL = 1;
-  string name = 2;
-  string color = 3;
+  required string URL = 1;
+  required string name = 2;
+  required string description = 3;
+  required string color = 4;
+}
+
+message Issue {
+  required User user = 1;
+  required uint64 number = 2;
+  required string title = 3;
+  required string state = 4;
+  required string HTMLURL = 5;
+  repeated Label labels = 6;
+  repeated User assignees = 7;
+  required string body = 8;
+  required string createdAt = 9;
+  required string updatedAt = 10;
+  required Milestone milestone = 11;
 }
 
 message IssueComment {
-  string body = 1;
-  string HTMLURL = 2;
-  User user = 3;
-  string CreatedAt = 4;
-  string UpdatedAt = 5;
+  optional string ID = 1;
+  required string body = 2;
+  optional User user = 3;
+  optional string HTMLURL = 4;
+  optional string createdAt = 5;
+  optional string updatedAt = 6;
 }
 
-message Asset {
-  string DownloadURL = 1;
-  string name = 2;
-  string contentType = 3;
+message IssueSearchResult {
+  optional uint64 total = 1;
+  repeated Issue issues = 2;
 }
 
-message Release {
-  string name = 1;
-  string tagName = 2;
-  string body = 3;
-  string URL = 4;
-  string HTMLURL = 5;
-  int64 DownloadCount = 6;
-  repeated Asset Asset = 7;
+message IssueEvent {
+  required IssueEventAction action = 1;
+  required Issue issue = 2;
+  required Repo repo = 3;
+  required Label label = 4;
+  required string GUID = 5;
 }
 
-message Empty {
-
+enum IssueEventAction {
+  IEA_ASSIGNED = 1;
+  IEA_UNASSIGNED = 2;
+  IEA_LABELED = 3;
+  IEA_UNLABELED = 4;
+  IEA_OPENED = 5;
+  IEA_EDITED = 6;
+  IEA_MILESTONED = 7;
+  IEA_DEMILESTONED = 8;
+  IEA_CLOSED = 9;
+  IEA_REOPENED = 10;
 }
 
-enum State {
-  OPEN = 0;
-  CLOSED = 1;
+message PullRequestBranch {
+  required string ref = 1;
+  required string SHA = 2;
+  required Repo repo = 3;
 }
 
-message Organisation {
-	string login =1;
+message PullRequest {
+  required uint64 number = 1;
+  required string HTMLURL = 2;
+  required User user = 3;
+  required PullRequestBranch base = 4;
+  required PullRequestBranch head = 5;
+  required string title = 6;
+  required string body = 7;
+  repeated User requestedReviewers = 8;
+  repeated User assignees = 9;
+  required string state = 10;
+  required bool draft = 11;
+  required bool merged = 12;
+  optional string createdAt = 13;
+  optional string updatedAt = 14;
+  required string mergeSHA = 15;
+  optional string mergeable = 16;
 }
 
+message Commit {
+  required string ID = 1;
+  required string message = 2;
+  repeated string added = 3;
+  repeated string removed = 4;
+  repeated string modified = 5;
+}
+
+message PushEvent {
+  required string ref = 1;
+  required string before = 2;
+  required string after = 3;
+  required bool created = 4;
+  required bool deleted = 5;
+  required bool forced = 6;
+  required string compare = 7;
+  repeated Commit commits = 8;
+  required User pusher = 9;
+  required User sender = 10;
+  required Repo repo = 11;
+  required string GUID = 12;
+}
+
+message StatusEvent {
+  optional string SHA = 1;
+  optional string state = 2;
+  optional string description = 3;
+  optional string targetURL = 4;
+  optional uint64 ID = 5;
+  optional string name = 6;
+  optional string context = 7;
+  optional User sender = 8;
+  optional Repo repo = 9;
+  required string GUID = 10;
+}
+
+message Review {
+  required uint64 ID = 1;
+  required User user = 2;
+  required string body = 3;
+  required ReviewState state = 4;
+  required string HTMLURL = 5;
+  required string submittedAt = 6;
+}
+
+message ReviewEvent {
+  required string action = 1;
+  required PullRequest pullRequest = 2;
+  required Repo repo = 3;
+  required Review review = 4;
+  required string GUID = 5;
+}
+
+message ReviewComment {
+  required uint64 ID = 1;
+  required uint64 reviewID = 2;
+  required User user = 3;
+  required string body = 4;
+  required string path = 5;
+  required string HTMLURL = 6;
+  required string createdAt = 7;
+  required string updatedAt = 8;
+  required uint64 position = 9;
+}
+
+message ListedIssueEvent {
+  required IssueEventAction event = 1;
+  required User actor = 2;
+  required Label label = 3;
+  required string createdAt = 4;
+}
+
+enum IssueCommentEventAction {
+  ICEA_CREATED = 1;
+  ICEA_EDITED_ = 2;
+  ICEA_DELETED = 3;
+}
+
+message IssueCommentEvent {
+  required IssueCommentEventAction action = 1;
+  required Issue issue = 2;
+  required IssueComment comment = 3;
+  required Repo repo = 4;
+  required string GUID = 5;
+}
+
+enum ReviewState {
+  RS_APPROVED = 1;
+  RS_CHANGES_REQUESTED = 2;
+  RS_COMMENTED = 3;
+  RS_DISMISSED = 4;
+  RS_PENDING = 5;
+}
+
+enum ReviewCommentEventAction {
+  RCEA_CREATED = 1;
+  RCEA_EDITED_ = 2;
+  RCEA_DELETED = 3;
+}
+
+message ReviewCommentEvent {
+  required ReviewCommentEventAction action = 1;
+  required PullRequest pullRequest = 2;
+  required Repo repo = 3;
+  required ReviewComment comment = 4;
+  required string GUID = 5;
+}
+
+enum ReviewAction {
+  RA_APPROVE = 1;
+  RA_REQUEST_CHANGES = 2;
+  RA_COMMENT = 3;
+}
+
+message DraftReview {
+  optional string commitSHA = 1;
+  required string body = 2;
+  optional ReviewAction action = 3;
+  repeated DraftReviewComment comments = 4;
+}
+
+message DraftReviewComment {
+  required string path = 1;
+  required uint64 position = 2;
+  required string body = 3;
+}
