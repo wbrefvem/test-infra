@@ -177,3 +177,15 @@ func GetRevisionFromSpec(spec *JobSpec) string {
 	}
 	return ""
 }
+
+// GetBranch returns the source code branch
+func GetBranch(spec *JobSpec) string {
+	branch := spec.Refs.BaseRef
+	if spec.Type == prowapi.PostsubmitJob || spec.Type == prowapi.BatchJob {
+		return branch
+	}
+	if len(spec.Refs.Pulls) > 0 {
+		branch = fmt.Sprintf("PR-%v", spec.Refs.Pulls[0].Number)
+	}
+	return branch
+}

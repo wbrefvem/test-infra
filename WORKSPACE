@@ -1003,12 +1003,12 @@ go_repository(
 go_repository(
     name = "com_github_knative_build",
     importpath = "github.com/knative/build",
-    tag = "v0.2.0",
+    tag = "v0.3.1-0.20190326080750-9bc0e357d17a",
 )
 
 go_repository(
     name = "com_github_knative_pkg",
-    commit = "0e41760cea1d",
+    commit = "baafd8072ebd",
     importpath = "github.com/knative/pkg",
 )
 
@@ -1706,4 +1706,40 @@ go_repository(
     name = "org_golang_x_perf",
     commit = "6e6d33e29852",
     importpath = "golang.org/x/perf",
+)
+
+go_repository(
+    name = "com_github_gobuffalo_envy",
+    importpath = "github.com/gobuffalo/envy",
+    tag = "v1.6.5",
+)
+
+go_repository(
+    name = "com_github_google_go_containerregistry",
+    commit = "5296537b6d5d",
+    importpath = "github.com/google/go-containerregistry",
+)
+
+go_repository(
+    name = "com_github_joho_godotenv",
+    importpath = "github.com/joho/godotenv",
+    tag = "v1.3.0",
+)
+
+go_repository(
+    name = "com_github_markbates_inflect",
+    importpath = "github.com/markbates/inflect",
+    tag = "v1.0.4",
+)
+
+go_repository(
+    name = "com_github_tektoncd_pipeline",
+    importpath = "github.com/tektoncd/pipeline",
+    tag = "v0.1.1-0.20190329113342-2743b6e0e4b6",
+)
+
+go_repository(
+    name = "io_k8s_kubernetes",
+    importpath = "k8s.io/kubernetes",
+    tag = "v1.14.0",
 )

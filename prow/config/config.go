@@ -81,6 +81,7 @@ type ProwConfig struct {
 	Orgs             map[string]org.Config `json:"orgs,omitempty"`
 	Gerrit           Gerrit                `json:"gerrit,omitempty"`
 	GitHubReporter   GitHubReporter        `json:"github_reporter,omitempty"`
+	Pipeline         Pipeline              `json:"pipeline,omitempty"`
 
 	// TODO: Move this out of the main config.
 	JenkinsOperators []JenkinsOperator `json:"jenkins_operators,omitempty"`
@@ -377,6 +378,13 @@ type GitHubOptions struct {
 	// LinkURL is the url representation of LinkURLFromConfig. This variable should be used
 	// in all places internally.
 	LinkURL *url.URL
+}
+
+// Pipleine is config for pipeline controller.
+type Pipeline struct {
+	Controller `json:",inline"`
+	// PipelineRunnerURL is the URL of the external pipeline runner service
+	PipelineRunnerURL string `json:"pipeline_runner_url,omitempty"`
 }
 
 // Load loads and parses the config at path.
@@ -1107,7 +1115,8 @@ func validateAgent(v JobBase, podNamespace string) error {
 	k := string(prowapi.KubernetesAgent)
 	b := string(prowapi.KnativeBuildAgent)
 	j := string(prowapi.JenkinsAgent)
-	agents := sets.NewString(k, b, j)
+	p := string(prowapi.TektonAgent)
+	agents := sets.NewString(k, b, j, p)
 	agent := v.Agent
 	switch {
 	case !agents.Has(agent):

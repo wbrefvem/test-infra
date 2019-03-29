@@ -37,6 +37,7 @@ require (
 	github.com/golang/groupcache v0.0.0-20180513044358-24b0969c4cb7 // indirect
 	github.com/golang/mock v1.2.0
 	github.com/golang/protobuf v1.2.0
+	github.com/google/go-containerregistry v0.0.0-20190327192230-5296537b6d5d // indirect
 	github.com/google/go-github v17.0.0+incompatible
 	github.com/google/uuid v1.0.0
 	github.com/googleapis/gnostic v0.1.0 // indirect
@@ -53,11 +54,12 @@ require (
 	github.com/jinzhu/inflection v0.0.0-20151009084129-3272df6c21d0 // indirect
 	github.com/jinzhu/now v0.0.0-20181116074157-8ec929ed50c3 // indirect
 	github.com/json-iterator/go v1.1.6 // indirect
-	github.com/knative/build v0.2.0
-	github.com/knative/pkg v0.0.0-20181205230426-0e41760cea1d
+	github.com/knative/build v0.3.1-0.20190326080750-9bc0e357d17a
+	github.com/knative/pkg v0.0.0-20190329001853-baafd8072ebd
 	github.com/kr/pretty v0.1.0 // indirect
 	github.com/lib/pq v1.0.0 // indirect
 	github.com/mailru/easyjson v0.0.0-20171120080333-32fa128f234d // indirect
+	github.com/markbates/inflect v1.0.4 // indirect
 	github.com/mattbaird/jsonpatch v0.0.0-20171005235357-81af80346b1a // indirect
 	github.com/mattn/go-sqlite3 v0.0.0-20160514122348-38ee283dabf1 // indirect
 	github.com/mattn/go-zglob v0.0.1
@@ -75,6 +77,7 @@ require (
 	github.com/sirupsen/logrus v1.2.0
 	github.com/spf13/cobra v0.0.3
 	github.com/spf13/pflag v1.0.3
+	github.com/tektoncd/pipeline v0.1.1-0.20190329113342-2743b6e0e4b6
 	github.com/xlab/handysort v0.0.0-20150421192137-fb3537ed64a1 // indirect
 	golang.org/x/crypto v0.0.0-20190308221718-c2843e01d9a2
 	golang.org/x/lint v0.0.0-20190301231843-5614ed5bae6f
@@ -97,6 +100,7 @@ require (
 	k8s.io/gengo v0.0.0-20190306031000-7a1b7fb0289f // indirect
 	k8s.io/klog v0.1.0
 	k8s.io/kube-openapi v0.0.0-20180711000925-0cf8f7e6ed1d // indirect
+	k8s.io/kubernetes v1.14.0 // indirect
 	mvdan.cc/xurls/v2 v2.0.0
 	sigs.k8s.io/yaml v1.1.0
 	vbom.ml/util v0.0.0-20170409195630-256737ac55c4
