@@ -671,9 +671,9 @@ func TestReconcile(t *testing.T) {
 			}(),
 		},
 		{
-			name:      "error when we cannot create pipeline run",
+			name:      "set job in error state when we cannot create pipeline run",
 			namespace: errorCreatePipelineRun,
-			err:       true,
+			err:       false,
 			observedJob: &prowjobv1.ProwJob{
 				Spec: prowjobv1.ProwJobSpec{
 					Agent:           prowjobv1.TektonAgent,
@@ -682,16 +682,17 @@ func TestReconcile(t *testing.T) {
 			},
 			expectedJob: func(pj prowjobv1.ProwJob, _ pipelinev1alpha1.PipelineRun) prowjobv1.ProwJob {
 				pj.Status = prowjobv1.ProwJobStatus{
-					StartTime:   now,
-					State:       prowjobv1.TriggeredState,
-					Description: descScheduling,
+					StartTime:      now,
+					CompletionTime: now.DeepCopy(),
+					State:          prowjobv1.ErrorState,
+					Description:    "injected request pipeline error",
 				}
 				return pj
 			},
 		},
 		{
-			name: "error when pipelinerunspec is nil",
-			err:  true,
+			name: "set job in error state when pipelinerunspec is nil and request pipeline run retuns an error",
+			err:  false,
 			observedJob: &prowjobv1.ProwJob{
 				Spec: prowjobv1.ProwJobSpec{
 					Agent:           prowjobv1.TektonAgent,
@@ -700,6 +701,15 @@ func TestReconcile(t *testing.T) {
 				Status: prowjobv1.ProwJobStatus{
 					State: prowjobv1.TriggeredState,
 				},
+			},
+			expectedJob: func(pj prowjobv1.ProwJob, _ pipelinev1alpha1.PipelineRun) prowjobv1.ProwJob {
+				pj.Status = prowjobv1.ProwJobStatus{
+					StartTime:      now,
+					CompletionTime: now.DeepCopy(),
+					State:          prowjobv1.ErrorState,
+					Description:    "no PipelineRunSpec defined",
+				}
+				return pj
 			},
 		},
 		{
