@@ -183,6 +183,10 @@ func (r *fakeReconciler) requestPipelineRun(context, namespace string, pj prowjo
 	return p.Name, nil
 }
 
+func (r *fakeReconciler) getProwJobURL(prowjobv1.ProwJob) string {
+	return ""
+}
+
 type fakeLimiter struct {
 	added string
 }

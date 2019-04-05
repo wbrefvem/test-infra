@@ -83,6 +83,8 @@ type controller struct {
 	prowJobsDone  bool
 	pipelinesDone map[string]bool
 	wait          string
+
+	log *logrus.Entry
 }
 
 // PipelineRunRequest request data sent to an external service which starts the pipeline
@@ -157,13 +159,17 @@ func (c *controller) hasSynced() bool {
 }
 
 func newController(kc kubernetes.Interface, pjc prowjobset.Interface, pji prowjobinfov1.ProwJobInformer, pipelineConfigs map[string]pipelineConfig,
-	totURL string, prowConfig config.Getter, rl workqueue.RateLimitingInterface) *controller {
+	totURL string, prowConfig config.Getter, rl workqueue.RateLimitingInterface, logger *logrus.Entry) *controller {
 	// Log to events
 	prowjobscheme.AddToScheme(scheme.Scheme)
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(logrus.Infof)
 	eventBroadcaster.StartRecordingToSink(&corev1.EventSinkImpl{Interface: kc.CoreV1().Events("")})
 	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, untypedcorev1.EventSource{Component: controllerName})
+
+	if logger == nil {
+		logger = logrus.NewEntry(logrus.StandardLogger())
+	}
 
 	c := &controller{
 		config:     prowConfig,
@@ -174,6 +180,7 @@ func newController(kc kubernetes.Interface, pjc prowjobset.Interface, pji prowjo
 		workqueue:  rl,
 		recorder:   recorder,
 		totURL:     totURL,
+		log:        logger,
 	}
 
 	logrus.Info("Setting up event handlers")
@@ -308,6 +315,7 @@ type reconciler interface {
 	pipelineID(prowjobv1.ProwJob) (string, error)
 	requestPipelineRun(context, namespace string, pj prowjobv1.ProwJob) (string, error)
 	now() metav1.Time
+	getProwJobURL(prowjobv1.ProwJob) string
 }
 
 func (c *controller) getPipelineConfig(ctx string) (pipelineConfig, error) {
@@ -407,6 +415,10 @@ func (c *controller) pipelineID(pj prowjobv1.ProwJob) (string, error) {
 	branch := downwardapi.GetBranch(&spec)
 	jobName := fmt.Sprintf("%s/%s/%s", pj.Spec.Refs.Org, pj.Spec.Refs.Repo, branch)
 	return pjutil.GetBuildID(jobName, c.totURL)
+}
+
+func (c *controller) getProwJobURL(pj prowjobv1.ProwJob) string {
+	return pjutil.JobURL(c.config().Plank, pj, c.log)
 }
 
 var (
@@ -537,6 +549,7 @@ func reconcile(c reconciler, key string) error {
 				return fmt.Errorf("failed to get pipeline id: %v", err)
 			}
 			pj.Status.BuildID = id
+			pj.Status.URL = c.getProwJobURL(*pj)
 			pr = makePipelineGitResource(*pj)
 			logrus.Infof("Create pipeline git resource: %s", key)
 			if pr, err = c.createPipelineResource(ctx, namespace, pr); err != nil {

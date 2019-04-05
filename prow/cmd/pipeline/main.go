@@ -133,7 +133,10 @@ func newPipelineConfig(cfg rest.Config, stop chan struct{}) (*pipelineConfig, er
 
 func main() {
 	o := parseOptions()
-	logrusutil.NewDefaultFieldsFormatter(nil, logrus.Fields{"component": "pipeline"})
+
+	logrus.SetFormatter(
+		logrusutil.NewDefaultFieldsFormatter(nil, logrus.Fields{"component": "pipeline"}),
+	)
 
 	pjutil.ServePProf()
 
@@ -192,7 +195,8 @@ func main() {
 		go runServer(o.cert, o.privateKey)
 	}
 
-	controller := newController(kc, pjc, pjif.Prow().V1().ProwJobs(), pipelineConfigs, o.totURL, configAgent.Config, kube.RateLimiter(controllerName))
+	logger := logrus.NewEntry(logrus.StandardLogger())
+	controller := newController(kc, pjc, pjif.Prow().V1().ProwJobs(), pipelineConfigs, o.totURL, configAgent.Config, kube.RateLimiter(controllerName), logger)
 	if err := controller.Run(1, stop); err != nil {
 		logrus.WithError(err).Fatal("Error running controller")
 	}
