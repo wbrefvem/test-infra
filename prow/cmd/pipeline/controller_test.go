@@ -89,6 +89,11 @@ func (r *fakeReconciler) updateProwJob(pj *prowjobv1.ProwJob) (*prowjobv1.ProwJo
 	return pj, nil
 }
 
+func (r *fakeReconciler) patchProwJob(pj *prowjobv1.ProwJob) error {
+	_, err := r.updateProwJob(pj)
+	return err
+}
+
 func (r *fakeReconciler) getPipelineRun(context, namespace, name string) (*pipelinev1alpha1.PipelineRun, error) {
 	logrus.Debugf("getPipelineRun: ctx=%s, ns=%s, name=%s", context, namespace, name)
 	if namespace == errorGetPipelineRun {
@@ -301,6 +306,7 @@ func TestReconcile(t *testing.T) {
 				StartTime:   now,
 				State:       prowjobv1.TriggeredState,
 				Description: descScheduling,
+				BuildID:     "1",
 			}
 			return pj
 		},

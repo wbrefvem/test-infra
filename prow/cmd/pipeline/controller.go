@@ -38,6 +38,7 @@ import (
 	"k8s.io/test-infra/prow/pod-utils/decorate"
 	"k8s.io/test-infra/prow/pod-utils/downwardapi"
 
+	jsonpatch "github.com/evanphx/json-patch"
 	duckv1alpha1 "github.com/knative/pkg/apis/duck/v1alpha1"
 	"github.com/sirupsen/logrus"
 	pipelinev1alpha1 "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1alpha1"
@@ -46,6 +47,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -306,7 +308,7 @@ func (c *controller) enqueueKey(ctx string, obj interface{}) {
 
 type reconciler interface {
 	getProwJob(name string) (*prowjobv1.ProwJob, error)
-	updateProwJob(pj *prowjobv1.ProwJob) (*prowjobv1.ProwJob, error)
+	patchProwJob(pj *prowjobv1.ProwJob) error
 	getPipelineRun(context, namespace, name string) (*pipelinev1alpha1.PipelineRun, error)
 	getPipelineRunWithSelector(context, namespace, selector string) (*pipelinev1alpha1.PipelineRun, error)
 	deletePipelineRun(context, namespace, name string) error
@@ -338,6 +340,27 @@ func (c *controller) getProwJob(name string) (*prowjobv1.ProwJob, error) {
 func (c *controller) updateProwJob(pj *prowjobv1.ProwJob) (*prowjobv1.ProwJob, error) {
 	logrus.Debugf("updateProwJob(%s)", pj.Name)
 	return c.pjc.ProwV1().ProwJobs(c.pjNamespace()).Update(pj)
+}
+
+func (c *controller) patchProwJob(newpj *prowjobv1.ProwJob) error {
+	newpjData, err := json.Marshal(newpj)
+	if err != nil {
+		return fmt.Errorf("marshaling the new ProwJob/%s: %v", newpj.GetName(), err)
+	}
+	pj, err := c.getProwJob(newpj.GetName())
+	if err != nil {
+		return fmt.Errorf("getting ProwJob/%s: %v", newpj.GetName(), err)
+	}
+	pjData, err := json.Marshal(pj)
+	if err != nil {
+		return fmt.Errorf("marshaling the ProwJob/%s: %v", pj.GetName(), err)
+	}
+	patch, err := jsonpatch.CreateMergePatch(pjData, newpjData)
+	if err != nil {
+		return fmt.Errorf("creating merge patch: %v", err)
+	}
+	_, err = c.pjc.Prow().ProwJobs(pj.Namespace).Patch(pj.Name, types.MergePatchType, patch)
+	return err
 }
 
 func (c *controller) getPipelineRun(context, namespace, name string) (*pipelinev1alpha1.PipelineRun, error) {
@@ -542,6 +565,8 @@ func reconcile(c reconciler, key string) error {
 			if err != nil {
 				return fmt.Errorf("finding pipeline %q: %v", pipelineRunName, err)
 			}
+			pj.Status.BuildID = getBuildID(p)
+			pj.Status.URL = c.getProwJobURL(*pj)
 		} else {
 			logrus.Infof("Create pipelinerun using embedded spec: %s", key)
 			id, err := c.pipelineID(*pj)
@@ -589,7 +614,7 @@ func updateProwJobState(c reconciler, pj *prowjobv1.ProwJob, state prowjobv1.Pro
 		npj.Status.State = state
 		npj.Status.Description = msg
 		logrus.Infof("Update %s /%s -> %s [ %s ]", npj.Kind, npj.Name, state, msg)
-		if _, err := c.updateProwJob(npj); err != nil {
+		if err := c.patchProwJob(npj); err != nil {
 			return fmt.Errorf("update prow status: %v", err)
 		}
 	}
@@ -805,4 +830,14 @@ func (c *controller) requestPipelineRun(context, namespace string, pj prowjobv1.
 	}
 
 	return "", fmt.Errorf("no PipelineRun object found returned by pipeline runner")
+}
+
+func getBuildID(pr *pipelinev1alpha1.PipelineRun) string {
+	for _, param := range pr.Spec.Params {
+		if param.Name == "build_id" {
+			return param.Value
+		}
+	}
+	// use a default build number if the real build number cannot be parsed
+	return "1"
 }
