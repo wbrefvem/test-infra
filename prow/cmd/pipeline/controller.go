@@ -38,6 +38,7 @@ import (
 	"k8s.io/test-infra/prow/pod-utils/decorate"
 	"k8s.io/test-infra/prow/pod-utils/downwardapi"
 
+	jsonpatch "github.com/evanphx/json-patch"
 	duckv1alpha1 "github.com/knative/pkg/apis/duck/v1alpha1"
 	"github.com/sirupsen/logrus"
 	pipelinev1alpha1 "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1alpha1"
@@ -46,6 +47,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -306,7 +308,7 @@ func (c *controller) enqueueKey(ctx string, obj interface{}) {
 
 type reconciler interface {
 	getProwJob(name string) (*prowjobv1.ProwJob, error)
-	updateProwJob(pj *prowjobv1.ProwJob) (*prowjobv1.ProwJob, error)
+	patchProwJob(pj *prowjobv1.ProwJob) error
 	getPipelineRun(context, namespace, name string) (*pipelinev1alpha1.PipelineRun, error)
 	getPipelineRunWithSelector(context, namespace, selector string) (*pipelinev1alpha1.PipelineRun, error)
 	deletePipelineRun(context, namespace, name string) error
@@ -338,6 +340,33 @@ func (c *controller) getProwJob(name string) (*prowjobv1.ProwJob, error) {
 func (c *controller) updateProwJob(pj *prowjobv1.ProwJob) (*prowjobv1.ProwJob, error) {
 	logrus.Debugf("updateProwJob(%s)", pj.Name)
 	return c.pjc.ProwV1().ProwJobs(c.pjNamespace()).Update(pj)
+}
+
+func (c *controller) patchProwJob(newpj *prowjobv1.ProwJob) error {
+	pj, err := c.pjc.ProwV1().ProwJobs(newpj.Namespace).Get(newpj.GetName(), metav1.GetOptions{})
+	if err != nil {
+		return fmt.Errorf("getting ProwJob/%s: %v", newpj.GetName(), err)
+	}
+	// Skip updating the resource version to avoid conflicts
+	newpj.ObjectMeta.ResourceVersion = pj.ObjectMeta.ResourceVersion
+	newpjData, err := json.Marshal(newpj)
+	if err != nil {
+		return fmt.Errorf("marshaling the new ProwJob/%s: %v", newpj.GetName(), err)
+	}
+	pjData, err := json.Marshal(pj)
+	if err != nil {
+		return fmt.Errorf("marshaling the ProwJob/%s: %v", pj.GetName(), err)
+	}
+	patch, err := jsonpatch.CreateMergePatch(pjData, newpjData)
+	if err != nil {
+		return fmt.Errorf("creating merge patch: %v", err)
+	}
+	if len(patch) == 0 {
+		return nil
+	}
+	logrus.Infof("Created merge patch: %v", string(patch))
+	_, err = c.pjc.ProwV1().ProwJobs(pj.Namespace).Patch(pj.Name, types.MergePatchType, patch)
+	return err
 }
 
 func (c *controller) getPipelineRun(context, namespace, name string) (*pipelinev1alpha1.PipelineRun, error) {
@@ -431,7 +460,7 @@ var (
 
 // reconcile ensures a tekton prowjob has a corresponding pipeline, updating the prowjob's status as the pipeline progresses.
 func reconcile(c reconciler, key string) error {
-	logrus.Debugf("reconcile: %s\n", key)
+	logrus.Debugf("Reconcile: %s\n", key)
 
 	ctx, namespace, name, kind, err := fromKey(key)
 	if err != nil {
@@ -542,6 +571,8 @@ func reconcile(c reconciler, key string) error {
 			if err != nil {
 				return fmt.Errorf("finding pipeline %q: %v", pipelineRunName, err)
 			}
+			pj.Status.BuildID = getBuildID(p)
+			pj.Status.URL = c.getProwJobURL(*pj)
 		} else {
 			logrus.Infof("Create pipelinerun using embedded spec: %s", key)
 			id, err := c.pipelineID(*pj)
@@ -588,8 +619,8 @@ func updateProwJobState(c reconciler, pj *prowjobv1.ProwJob, state prowjobv1.Pro
 		}
 		npj.Status.State = state
 		npj.Status.Description = msg
-		logrus.Infof("Update %s /%s -> %s [ %s ]", npj.Kind, npj.Name, state, msg)
-		if _, err := c.updateProwJob(npj); err != nil {
+		logrus.Infof("Update ProwJob/%s: %s - %s [ %s ]", pj.GetName(), haveState, state, msg)
+		if err := c.patchProwJob(npj); err != nil {
 			return fmt.Errorf("update prow status: %v", err)
 		}
 	}
@@ -805,4 +836,14 @@ func (c *controller) requestPipelineRun(context, namespace string, pj prowjobv1.
 	}
 
 	return "", fmt.Errorf("no PipelineRun object found returned by pipeline runner")
+}
+
+func getBuildID(pr *pipelinev1alpha1.PipelineRun) string {
+	for _, param := range pr.Spec.Params {
+		if param.Name == "build_id" {
+			return param.Value
+		}
+	}
+	// use a default build number if the real build number cannot be parsed
+	return "1"
 }
