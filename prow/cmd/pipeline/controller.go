@@ -343,13 +343,15 @@ func (c *controller) updateProwJob(pj *prowjobv1.ProwJob) (*prowjobv1.ProwJob, e
 }
 
 func (c *controller) patchProwJob(newpj *prowjobv1.ProwJob) error {
+	pj, err := c.pjc.ProwV1().ProwJobs(newpj.Namespace).Get(newpj.GetName(), metav1.GetOptions{})
+	if err != nil {
+		return fmt.Errorf("getting ProwJob/%s: %v", newpj.GetName(), err)
+	}
+	// Skip updating the resource version to avoid conflicts
+	newpj.ObjectMeta.ResourceVersion = pj.ObjectMeta.ResourceVersion
 	newpjData, err := json.Marshal(newpj)
 	if err != nil {
 		return fmt.Errorf("marshaling the new ProwJob/%s: %v", newpj.GetName(), err)
-	}
-	pj, err := c.getProwJob(newpj.GetName())
-	if err != nil {
-		return fmt.Errorf("getting ProwJob/%s: %v", newpj.GetName(), err)
 	}
 	pjData, err := json.Marshal(pj)
 	if err != nil {
@@ -359,7 +361,11 @@ func (c *controller) patchProwJob(newpj *prowjobv1.ProwJob) error {
 	if err != nil {
 		return fmt.Errorf("creating merge patch: %v", err)
 	}
-	_, err = c.pjc.Prow().ProwJobs(pj.Namespace).Patch(pj.Name, types.MergePatchType, patch)
+	if len(patch) == 0 {
+		return nil
+	}
+	logrus.Infof("Created merge patch: %v", string(patch))
+	_, err = c.pjc.ProwV1().ProwJobs(pj.Namespace).Patch(pj.Name, types.MergePatchType, patch)
 	return err
 }
 
@@ -454,7 +460,7 @@ var (
 
 // reconcile ensures a tekton prowjob has a corresponding pipeline, updating the prowjob's status as the pipeline progresses.
 func reconcile(c reconciler, key string) error {
-	logrus.Debugf("reconcile: %s\n", key)
+	logrus.Debugf("Reconcile: %s\n", key)
 
 	ctx, namespace, name, kind, err := fromKey(key)
 	if err != nil {
@@ -613,7 +619,7 @@ func updateProwJobState(c reconciler, pj *prowjobv1.ProwJob, state prowjobv1.Pro
 		}
 		npj.Status.State = state
 		npj.Status.Description = msg
-		logrus.Infof("Update %s /%s -> %s [ %s ]", npj.Kind, npj.Name, state, msg)
+		logrus.Infof("Update ProwJob/%s: %s - %s [ %s ]", pj.GetName(), haveState, state, msg)
 		if err := c.patchProwJob(npj); err != nil {
 			return fmt.Errorf("update prow status: %v", err)
 		}
