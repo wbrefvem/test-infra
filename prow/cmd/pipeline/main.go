@@ -109,7 +109,7 @@ type pipelineConfig struct {
 }
 
 // newPipelineConfig returns a client and informer capable of mutating and monitoring the specified config.
-func newPipelineConfig(cfg rest.Config, stop chan struct{}) (*pipelineConfig, error) {
+func newPipelineConfig(cfg rest.Config, stop chan struct{}, namespace string) (*pipelineConfig, error) {
 	bc, err := pipelineset.NewForConfig(&cfg)
 	if err != nil {
 		return nil, err
@@ -122,7 +122,7 @@ func newPipelineConfig(cfg rest.Config, stop chan struct{}) (*pipelineConfig, er
 		return nil, err
 	}
 	// Assume watches receive updates, but resync every 30m in case something wonky happens
-	bif := pipelineinfo.NewSharedInformerFactory(bc, 30*time.Minute)
+	bif := pipelineinfo.NewSharedInformerFactoryWithOptions(bc, 30*time.Minute, pipelineinfo.WithNamespace(namespace))
 	bif.Tekton().V1alpha1().PipelineRuns().Lister()
 	go bif.Start(stop)
 	return &pipelineConfig{
@@ -172,14 +172,16 @@ func main() {
 	if err != nil {
 		logrus.WithError(err).Fatal("Failed to create prowjob client")
 	}
-	pjif := prowjobinfo.NewSharedInformerFactory(pjc, 30*time.Minute)
+
+	pjNamespace := configAgent.Config().ProwJobNamespace
+	pjif := prowjobinfo.NewSharedInformerFactoryWithOptions(pjc, 30*time.Minute, prowjobinfo.WithNamespace(pjNamespace))
 	pjif.Prow().V1().ProwJobs().Lister()
 	go pjif.Start(stop)
 
 	pipelineConfigs := map[string]pipelineConfig{}
 	for context, cfg := range configs {
 		var bc *pipelineConfig
-		bc, err = newPipelineConfig(cfg, stop)
+		bc, err = newPipelineConfig(cfg, stop, pjNamespace)
 		if apierrors.IsNotFound(err) {
 			logrus.WithError(err).Warnf("Ignoring %s: knative pipeline CRD not deployed", context)
 			continue
