@@ -14,7 +14,7 @@ pipelineConfig:
     pullRequest:
       pipeline:
         agent:
-          image: gcr.io/jenkinsxio/prow-builder:0.0.3
+          image: gcr.io/jenkinsxio/prow-builder:0.0.5
         stages:
         - name: build
           steps:
@@ -34,12 +34,12 @@ pipelineConfig:
     release:
       pipeline:
         agent:
-          image: gcr.io/jenkinsxio/prow-builder:0.0.3
+          image: gcr.io/jenkinsxio/prow-builder:0.0.5
         stages:
           - name: release
             steps:
             - name: build
-              image: gcr.io/jenkinsxio/prow-builder:0.0.3
+              image: gcr.io/jenkinsxio/prow-builder:0.0.5
               command: bazel
               args:
               - build
@@ -57,5 +57,5 @@ pipelineConfig:
               - -f
               - /usr/local/lib/bazel/etc/google-creds.json
             - name: build-and-push-image
-              image: gcr.io/jenkinsxio/prow-builder:0.0.3
-              command: /test-infra/prow/push.sh
+              image: gcr.io/jenkinsxio/prow-builder:0.0.5
+              command: /workspace/source/prow/push.sh
