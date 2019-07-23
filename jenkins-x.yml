@@ -23,6 +23,15 @@ pipelineConfig:
             args: 
             - build
             - //prow/...
+          options:
+            containerOptions:
+              resources:
+                limits:
+                  cpu: 4
+                  memory: 16Gi
+                requests:
+                  cpu: 3
+                  memory: 8Gi
         - name: test
           steps:
           - name: test
@@ -31,12 +40,30 @@ pipelineConfig:
             - test
             - --features=race
             - //prow/...
+          options:
+            containerOptions:
+              resources:
+                limits:
+                  cpu: 4
+                  memory: 16Gi
+                requests:
+                  cpu: 3
+                  memory: 8Gi
     release:
       pipeline:
         agent:
           image: gcr.io/jenkinsxio/prow-builder:0.0.5
         stages:
           - name: release
+            options:
+              containerOptions:
+                resources:
+                  limits:
+                    cpu: 4
+                    memory: 16Gi
+                  requests:
+                    cpu: 3
+                    memory: 8Gi
             steps:
             - name: build
               image: gcr.io/jenkinsxio/prow-builder:0.0.5
