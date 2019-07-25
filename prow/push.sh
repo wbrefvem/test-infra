@@ -51,8 +51,8 @@ fi
 
 if [[ -n "${GOOGLE_APPLICATION_CREDENTIALS:-}" ]]; then
   echo "Detected GOOGLE_APPLICATION_CREDENTIALS, activating..." >&2
-  gcloud auth activate-service-account --key-file="${GOOGLE_APPLICATION_CREDENTIALS}"
-  gcloud auth configure-docker
+  gcloud -q auth activate-service-account --key-file="$GOOGLE_APPLICATION_CREDENTIALS"
+  gcloud -q auth configure-docker
 fi
 
 # Build and push the current commit, failing on any uncommitted changes.
