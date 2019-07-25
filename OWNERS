@@ -1,15 +1,45 @@
-# See the OWNERS docs at https://go.k8s.io/owners
-
 approvers:
-- amwat # oncall
-# - BenTheElder # emeritus
-- cjwagner # oncall
-- fejta # lead
-- ixdy # oncall
-- Katharine # oncall
-- krzyzacy # oncall
-- spiffxp # lead
-- stevekuznetsov # lead
-
-labels:
-- sig/testing
+- rawlingsj
+- jstrachan
+- rajdavies
+- ccojocar
+- garethjevans
+- pmuir
+- jtnord
+- agentgonzo
+- markawm
+- amuniz
+- mikecirioli
+- wbrefvem
+- daveconde
+- hferentschik
+- abayer
+- dwnusbaum
+- warrenbailey
+- cagiti
+- dgozalo
+- joseblas
+- macox
+reviewers:
+- rawlingsj
+- jstrachan
+- rajdavies
+- ccojocar
+- garethjevans
+- pmuir
+- jtnord
+- agentgonzo
+- markawm
+- amuniz
+- mikecirioli
+- wbrefvem
+- carlossg
+- daveconde
+- hferentschik
+- abayer
+- dwnusbaum
+- warrenbailey
+- cagiti
+- dgozalo
+- joseblas
+- macox

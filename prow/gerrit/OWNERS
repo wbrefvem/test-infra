@@ -1,6 +1,45 @@
-# See the OWNERS docs at https://go.k8s.io/owners
-
 approvers:
-- krzyzacy
-labels:
-- area/prow/gerrit
+- rawlingsj
+- jstrachan
+- rajdavies
+- ccojocar
+- garethjevans
+- pmuir
+- jtnord
+- agentgonzo
+- markawm
+- amuniz
+- mikecirioli
+- wbrefvem
+- daveconde
+- hferentschik
+- abayer
+- dwnusbaum
+- warrenbailey
+- cagiti
+- dgozalo
+- joseblas
+- macox
+reviewers:
+- rawlingsj
+- jstrachan
+- rajdavies
+- ccojocar
+- garethjevans
+- pmuir
+- jtnord
+- agentgonzo
+- markawm
+- amuniz
+- mikecirioli
+- wbrefvem
+- carlossg
+- daveconde
+- hferentschik
+- abayer
+- dwnusbaum
+- warrenbailey
+- cagiti
+- dgozalo
+- joseblas
+- macox

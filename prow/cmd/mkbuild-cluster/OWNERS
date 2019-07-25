@@ -1,4 +1,45 @@
-# See the OWNERS docs at https://go.k8s.io/owners
-
-labels:
- - area/prow/mkbuild-cluster
+approvers:
+- rawlingsj
+- jstrachan
+- rajdavies
+- ccojocar
+- garethjevans
+- pmuir
+- jtnord
+- agentgonzo
+- markawm
+- amuniz
+- mikecirioli
+- wbrefvem
+- daveconde
+- hferentschik
+- abayer
+- dwnusbaum
+- warrenbailey
+- cagiti
+- dgozalo
+- joseblas
+- macox
+reviewers:
+- rawlingsj
+- jstrachan
+- rajdavies
+- ccojocar
+- garethjevans
+- pmuir
+- jtnord
+- agentgonzo
+- markawm
+- amuniz
+- mikecirioli
+- wbrefvem
+- carlossg
+- daveconde
+- hferentschik
+- abayer
+- dwnusbaum
+- warrenbailey
+- cagiti
+- dgozalo
+- joseblas
+- macox
