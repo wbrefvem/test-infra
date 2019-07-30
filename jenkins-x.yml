@@ -7,7 +7,7 @@ pipelineConfig:
   - name: GOPROXY
     value: http://jenkins-x-athens-proxy
   - name: GOOGLE_APPLICATION_CREDENTIALS
-    value: /usr/local/lib/bazel/etc/google-creds.json
+    value: /builder/home/kaniko-secret.json
   - name: PROW_REPO_OVERRIDE
     value: gcr.io/jenkinsxio/prow
   pipelines:
@@ -82,7 +82,7 @@ pipelineConfig:
               - -k
               - kaniko-secret
               - -f
-              - /usr/local/lib/bazel/etc/google-creds.json
+              - /builder/home/kaniko-secret.json
             - name: build-and-push-image
               image: gcr.io/jenkinsxio/prow-builder:0.0.5
               command: /workspace/source/prow/push.sh
