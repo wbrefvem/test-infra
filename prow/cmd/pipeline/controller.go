@@ -24,6 +24,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"sort"
 	"strings"
 	"time"
 
@@ -310,7 +311,7 @@ type reconciler interface {
 	getProwJob(name string) (*prowjobv1.ProwJob, error)
 	patchProwJob(pj *prowjobv1.ProwJob) error
 	getPipelineRun(context, namespace, name string) (*pipelinev1alpha1.PipelineRun, error)
-	getPipelineRunWithSelector(context, namespace, selector string) (*pipelinev1alpha1.PipelineRun, error)
+	getPipelineRunsWithSelector(context, namespace, selector string) ([]*pipelinev1alpha1.PipelineRun, error)
 	deletePipelineRun(context, namespace, name string) error
 	createPipelineRun(context, namespace string, b *pipelinev1alpha1.PipelineRun) (*pipelinev1alpha1.PipelineRun, error)
 	createPipelineResource(context, namespace string, b *pipelinev1alpha1.PipelineResource) (*pipelinev1alpha1.PipelineResource, error)
@@ -377,7 +378,7 @@ func (c *controller) getPipelineRun(context, namespace, name string) (*pipelinev
 	return p.informer.Lister().PipelineRuns(namespace).Get(name)
 }
 
-func (c *controller) getPipelineRunWithSelector(context, namespace, selector string) (*pipelinev1alpha1.PipelineRun, error) {
+func (c *controller) getPipelineRunsWithSelector(context, namespace, selector string) ([]*pipelinev1alpha1.PipelineRun, error) {
 	p, err := c.getPipelineConfig(context)
 	if err != nil {
 		return nil, err
@@ -397,7 +398,10 @@ func (c *controller) getPipelineRunWithSelector(context, namespace, selector str
 	if len(runs) == 0 {
 		return nil, apierrors.NewNotFound(pipelinev1alpha1.Resource("pipelinerun"), label.String())
 	}
-	return runs[0], nil
+	sort.Slice(runs, func(i int, j int) bool {
+		return runs[i].CreationTimestamp.Before(&runs[j].CreationTimestamp)
+	})
+	return runs, nil
 }
 
 func (c *controller) deletePipelineRun(context, namespace, name string) error {
@@ -474,6 +478,7 @@ func reconcile(c reconciler, key string) error {
 	var pj *prowjobv1.ProwJob
 	var p *pipelinev1alpha1.PipelineRun
 	var pr *pipelinev1alpha1.PipelineResource
+	var runs []*pipelinev1alpha1.PipelineRun
 
 	switch kind {
 	case prowJob:
@@ -502,14 +507,14 @@ func reconcile(c reconciler, key string) error {
 		reported = isReported(&pj.Status)
 
 		selector := fmt.Sprintf("%s = %s", prowJobName, name)
-		p, err = c.getPipelineRunWithSelector(ctx, namespace, selector)
+		runs, err = c.getPipelineRunsWithSelector(ctx, namespace, selector)
 		switch {
 		case apierrors.IsNotFound(err):
 			// Do not have a pipeline
 		case err != nil:
-			return fmt.Errorf("get pipelinerun %s: %v", key, err)
+			return fmt.Errorf("get pipelineruns %s: %v", key, err)
 		}
-		if p != nil {
+		if len(runs) > 0 {
 			havePipelineRun = true
 		}
 	case pipelineRun:
@@ -527,6 +532,11 @@ func reconcile(c reconciler, key string) error {
 			return fmt.Errorf("no matching prowjob for pipelinerun %s: %v", name, err)
 		}
 
+		selector := fmt.Sprintf("%s = %s", prowJobName, name)
+		runs, err = c.getPipelineRunsWithSelector(ctx, namespace, selector)
+		if err != nil {
+			return fmt.Errorf("get pipelineruns %s by prow job %s: %v", key, prowJobName, err)
+		}
 		havePipelineRun = true
 
 		if p.DeletionTimestamp == nil {
@@ -571,6 +581,7 @@ func reconcile(c reconciler, key string) error {
 			if err != nil {
 				return fmt.Errorf("finding pipeline %q: %v", pipelineRunName, err)
 			}
+			runs = append(runs, p)
 			pj.Status.BuildID = getBuildID(p)
 			pj.Status.URL = c.getProwJobURL(*pj)
 		} else {
@@ -595,13 +606,14 @@ func reconcile(c reconciler, key string) error {
 			if err != nil {
 				return fmt.Errorf("create PipelineRun: %v", err)
 			}
+			runs = append(runs, p)
 		}
 	}
 
-	if p == nil {
+	if len(runs) == 0 {
 		return fmt.Errorf("no pipelinerun found or created for %q, wantPipelineRun was %v", key, wantPipelineRun)
 	}
-	wantState, wantMsg := prowJobStatus(p.Status)
+	wantState, wantMsg := prowJobStatus(runs)
 	return updateProwJobState(c, pj, wantState, wantMsg)
 }
 
@@ -665,8 +677,30 @@ const (
 	descMissingCondition = "missing end condition"
 )
 
-// prowJobStatus returns the desired state and description based on the pipeline status
-func prowJobStatus(ps pipelinev1alpha1.PipelineRunStatus) (prowjobv1.ProwJobState, string) {
+// prowJobStatus returns the worst state of any of the PipelineRuns passed to it
+func prowJobStatus(runs []*pipelinev1alpha1.PipelineRun) (prowjobv1.ProwJobState, string) {
+	var worstState *prowjobv1.ProwJobState
+	worstDesc := ""
+
+	for _, pr := range runs {
+		runState, runDesc := prowJobStatusForSinglePipelineRun(pr.Status)
+		if worstState == nil {
+			worstState = &runState
+			worstDesc = runDesc
+		} else if worstState != &runState {
+			// Always overwrite earlier successes.
+			if *worstState == prowjobv1.SuccessState {
+				worstState = &runState
+				worstDesc = runDesc
+			}
+		}
+	}
+
+	return *worstState, worstDesc
+}
+
+// prowJobStatusForSinglePipelineRun returns the desired state and description based on the pipeline status
+func prowJobStatusForSinglePipelineRun(ps pipelinev1alpha1.PipelineRunStatus) (prowjobv1.ProwJobState, string) {
 	pcond := ps.GetCondition(duckv1alpha1.ConditionSucceeded)
 	if pcond == nil {
 		return prowjobv1.TriggeredState, descScheduling
@@ -752,10 +786,18 @@ func makePipelineGitResource(pj prowjobv1.ProwJob) *pipelinev1alpha1.PipelineRes
 	return &pr
 }
 
-// makePipeline creates a PipelineRun from a prow job using the PipelineRunSpec defined in the prow job
 func makePipelineRun(pj prowjobv1.ProwJob, buildID string, pr *pipelinev1alpha1.PipelineResource) (*pipelinev1alpha1.PipelineRun, error) {
+	return makePipelineRunWithPrefix(pj, buildID, pr, "")
+}
+
+// makePipelineRunWithPrefix creates a PipelineRun from a prow job using the PipelineRunSpec defined in the prow job
+func makePipelineRunWithPrefix(pj prowjobv1.ProwJob, buildID string, pr *pipelinev1alpha1.PipelineResource, prefix string) (*pipelinev1alpha1.PipelineRun, error) {
 	if pj.Spec.PipelineRunSpec == nil {
 		return nil, errors.New("no PipelineRunSpec defined")
+	}
+	name := pr.Name
+	if prefix != "" {
+		name = prefix + "-" + name
 	}
 	p := pipelinev1alpha1.PipelineRun{
 		ObjectMeta: pipelineMeta(pj),
@@ -766,7 +808,7 @@ func makePipelineRun(pj prowjobv1.ProwJob, buildID string, pr *pipelinev1alpha1.
 		Value: buildID,
 	})
 	rb := pipelinev1alpha1.PipelineResourceBinding{
-		Name: pr.Name,
+		Name: name,
 		ResourceRef: pipelinev1alpha1.PipelineResourceRef{
 			Name:       pr.Name,
 			APIVersion: pr.APIVersion,

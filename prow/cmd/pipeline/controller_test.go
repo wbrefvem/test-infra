@@ -135,12 +135,13 @@ func (r *fakeReconciler) createPipelineRun(context, namespace string, p *pipelin
 	return p, nil
 }
 
-func (r *fakeReconciler) getPipelineRunWithSelector(context, namespace, selector string) (*pipelinev1alpha1.PipelineRun, error) {
+func (r *fakeReconciler) getPipelineRunsWithSelector(context, namespace, selector string) ([]*pipelinev1alpha1.PipelineRun, error) {
 	parts := strings.Split(selector, "=")
 	if len(parts) != 2 {
 		return nil, fmt.Errorf("invalid selector: %s", selector)
 	}
 	pjName := strings.TrimSpace(parts[1])
+	var runs []*pipelinev1alpha1.PipelineRun
 	for _, p := range r.pipelines {
 		labels := p.Labels
 		for label, value := range labels {
@@ -150,9 +151,12 @@ func (r *fakeReconciler) getPipelineRunWithSelector(context, namespace, selector
 				if !ok {
 					return nil, apierrors.NewNotFound(pipelinev1alpha1.Resource("PipelineRun"), pjName)
 				}
-				return &p, nil
+				runs = append(runs, &p)
 			}
 		}
+	}
+	if len(runs) > 0 {
+		return runs, nil
 	}
 	return nil, apierrors.NewNotFound(pipelinev1alpha1.Resource("PipelineRun"), pjName)
 }
@@ -285,14 +289,14 @@ func TestReconcile(t *testing.T) {
 		return p
 	}
 	cases := []struct {
-		name                string
-		namespace           string
-		context             string
-		observedJob         *prowjobv1.ProwJob
-		observedPipelineRun *pipelinev1alpha1.PipelineRun
-		expectedJob         func(prowjobv1.ProwJob, pipelinev1alpha1.PipelineRun) prowjobv1.ProwJob
-		expectedPipelineRun func(prowjobv1.ProwJob, pipelinev1alpha1.PipelineRun) pipelinev1alpha1.PipelineRun
-		err                 bool
+		name                 string
+		namespace            string
+		context              string
+		observedJob          *prowjobv1.ProwJob
+		observedPipelineRuns []*pipelinev1alpha1.PipelineRun
+		expectedJob          func(prowjobv1.ProwJob, pipelinev1alpha1.PipelineRun) prowjobv1.ProwJob
+		expectedPipelineRun  func(prowjobv1.ProwJob, pipelinev1alpha1.PipelineRun) pipelinev1alpha1.PipelineRun
+		err                  bool
 	}{{
 		name: "new prow job creates pipeline",
 		observedJob: &prowjobv1.ProwJob{
@@ -361,7 +365,7 @@ func TestReconcile(t *testing.T) {
 		},
 		{
 			name: "delete pipeline run after deleting prowjob",
-			observedPipelineRun: func() *pipelinev1alpha1.PipelineRun {
+			observedPipelineRuns: func() []*pipelinev1alpha1.PipelineRun {
 				pj := prowjobv1.ProwJob{}
 				pj.Spec.Type = prowjobv1.PeriodicJob
 				pj.Spec.PipelineRunSpec = &pipelinev1alpha1.PipelineRunSpec{}
@@ -370,13 +374,13 @@ func TestReconcile(t *testing.T) {
 				if err != nil {
 					panic(err)
 				}
-				return p
+				return []*pipelinev1alpha1.PipelineRun{p}
 			}(),
 			err: true,
 		},
 		{
 			name: "do not delete deleted pipeline runs",
-			observedPipelineRun: func() *pipelinev1alpha1.PipelineRun {
+			observedPipelineRuns: func() []*pipelinev1alpha1.PipelineRun {
 				pj := prowjobv1.ProwJob{}
 				pj.Spec.Type = prowjobv1.PeriodicJob
 				pj.Spec.PipelineRunSpec = &pipelinev1alpha1.PipelineRunSpec{}
@@ -386,14 +390,14 @@ func TestReconcile(t *testing.T) {
 				if err != nil {
 					panic(err)
 				}
-				return p
+				return []*pipelinev1alpha1.PipelineRun{p}
 			}(),
 			expectedPipelineRun: noPipelineRunChange,
 			err:                 true,
 		},
 		{
 			name: "only delete pipeline runs created by controller",
-			observedPipelineRun: func() *pipelinev1alpha1.PipelineRun {
+			observedPipelineRuns: func() []*pipelinev1alpha1.PipelineRun {
 				pj := prowjobv1.ProwJob{}
 				pj.Spec.Type = prowjobv1.PeriodicJob
 				pj.Spec.PipelineRunSpec = &pipelinev1alpha1.PipelineRunSpec{}
@@ -403,7 +407,7 @@ func TestReconcile(t *testing.T) {
 					panic(err)
 				}
 				delete(p.Labels, kube.CreatedByProw)
-				return p
+				return []*pipelinev1alpha1.PipelineRun{p}
 			}(),
 			expectedPipelineRun: noPipelineRunChange,
 			err:                 true,
@@ -425,7 +429,7 @@ func TestReconcile(t *testing.T) {
 					Description: "fancy",
 				},
 			},
-			observedPipelineRun: func() *pipelinev1alpha1.PipelineRun {
+			observedPipelineRuns: func() []*pipelinev1alpha1.PipelineRun {
 				pj := prowjobv1.ProwJob{}
 				pj.Spec.Type = prowjobv1.PeriodicJob
 				pj.Spec.Agent = prowjobv1.TektonAgent
@@ -435,7 +439,7 @@ func TestReconcile(t *testing.T) {
 				if err != nil {
 					panic(err)
 				}
-				return p
+				return []*pipelinev1alpha1.PipelineRun{p}
 			}(),
 			expectedJob:         noJobChange,
 			expectedPipelineRun: noPipelineRunChange,
@@ -457,7 +461,7 @@ func TestReconcile(t *testing.T) {
 					Description: "fancy",
 				},
 			},
-			observedPipelineRun: func() *pipelinev1alpha1.PipelineRun {
+			observedPipelineRuns: func() []*pipelinev1alpha1.PipelineRun {
 				pj := prowjobv1.ProwJob{}
 				pj.Spec.Type = prowjobv1.PeriodicJob
 				pj.Spec.Agent = prowjobv1.TektonAgent
@@ -468,7 +472,7 @@ func TestReconcile(t *testing.T) {
 					panic(err)
 				}
 				delete(p.Labels, kube.CreatedByProw)
-				return p
+				return []*pipelinev1alpha1.PipelineRun{p}
 			}(),
 			expectedJob:         noJobChange,
 			expectedPipelineRun: noPipelineRunChange,
@@ -488,7 +492,7 @@ func TestReconcile(t *testing.T) {
 					Description: "fancy",
 				},
 			},
-			observedPipelineRun: func() *pipelinev1alpha1.PipelineRun {
+			observedPipelineRuns: func() []*pipelinev1alpha1.PipelineRun {
 				pj := prowjobv1.ProwJob{}
 				pj.Spec.Type = prowjobv1.PeriodicJob
 				pj.Spec.Agent = prowjobv1.TektonAgent
@@ -500,7 +504,7 @@ func TestReconcile(t *testing.T) {
 				if err != nil {
 					panic(err)
 				}
-				return p
+				return []*pipelinev1alpha1.PipelineRun{p}
 			}(),
 			expectedJob: func(pj prowjobv1.ProwJob, _ pipelinev1alpha1.PipelineRun) prowjobv1.ProwJob {
 				pj.Status.State = prowjobv1.TriggeredState
@@ -521,7 +525,7 @@ func TestReconcile(t *testing.T) {
 					Description: "fancy",
 				},
 			},
-			observedPipelineRun: func() *pipelinev1alpha1.PipelineRun {
+			observedPipelineRuns: func() []*pipelinev1alpha1.PipelineRun {
 				pj := prowjobv1.ProwJob{}
 				pj.Spec.Type = prowjobv1.PeriodicJob
 				pj.Spec.Agent = prowjobv1.TektonAgent
@@ -535,7 +539,7 @@ func TestReconcile(t *testing.T) {
 					Type:    duckv1alpha1.ConditionReady,
 					Message: "hello",
 				})
-				return p
+				return []*pipelinev1alpha1.PipelineRun{p}
 			}(),
 			expectedJob: func(pj prowjobv1.ProwJob, _ pipelinev1alpha1.PipelineRun) prowjobv1.ProwJob {
 				pj.Status = prowjobv1.ProwJobStatus{
@@ -559,7 +563,7 @@ func TestReconcile(t *testing.T) {
 					Description: "fancy",
 				},
 			},
-			observedPipelineRun: func() *pipelinev1alpha1.PipelineRun {
+			observedPipelineRuns: func() []*pipelinev1alpha1.PipelineRun {
 				pj := prowjobv1.ProwJob{}
 				pj.Spec.Type = prowjobv1.PeriodicJob
 				pj.Spec.Agent = prowjobv1.TektonAgent
@@ -574,7 +578,7 @@ func TestReconcile(t *testing.T) {
 					Status:  corev1.ConditionTrue,
 					Message: "hello",
 				})
-				return p
+				return []*pipelinev1alpha1.PipelineRun{p}
 			}(),
 			expectedJob: func(pj prowjobv1.ProwJob, _ pipelinev1alpha1.PipelineRun) prowjobv1.ProwJob {
 				pj.Status = prowjobv1.ProwJobStatus{
@@ -599,7 +603,7 @@ func TestReconcile(t *testing.T) {
 					Description: "fancy",
 				},
 			},
-			observedPipelineRun: func() *pipelinev1alpha1.PipelineRun {
+			observedPipelineRuns: func() []*pipelinev1alpha1.PipelineRun {
 				pj := prowjobv1.ProwJob{}
 				pj.Spec.Type = prowjobv1.PeriodicJob
 				pj.Spec.Agent = prowjobv1.TektonAgent
@@ -614,7 +618,7 @@ func TestReconcile(t *testing.T) {
 					Status:  corev1.ConditionFalse,
 					Message: "hello",
 				})
-				return p
+				return []*pipelinev1alpha1.PipelineRun{p}
 			}(),
 			expectedJob: func(pj prowjobv1.ProwJob, _ pipelinev1alpha1.PipelineRun) prowjobv1.ProwJob {
 				pj.Status = prowjobv1.ProwJobStatus{
@@ -646,7 +650,7 @@ func TestReconcile(t *testing.T) {
 			name:      "error when we cannot get pipeline run",
 			namespace: errorGetPipelineRun,
 			err:       true,
-			observedPipelineRun: func() *pipelinev1alpha1.PipelineRun {
+			observedPipelineRuns: func() []*pipelinev1alpha1.PipelineRun {
 				pj := prowjobv1.ProwJob{}
 				pj.Spec.Type = prowjobv1.PeriodicJob
 				pj.Spec.Agent = prowjobv1.TektonAgent
@@ -661,14 +665,14 @@ func TestReconcile(t *testing.T) {
 					Status:  corev1.ConditionTrue,
 					Message: "hello",
 				})
-				return p
+				return []*pipelinev1alpha1.PipelineRun{p}
 			}(),
 		},
 		{
 			name:      "error when we cannot delete pipeline run",
 			namespace: errorDeletePipelineRun,
 			err:       true,
-			observedPipelineRun: func() *pipelinev1alpha1.PipelineRun {
+			observedPipelineRuns: func() []*pipelinev1alpha1.PipelineRun {
 				pj := prowjobv1.ProwJob{}
 				pj.Spec.Type = prowjobv1.PeriodicJob
 				pj.Spec.PipelineRunSpec = &pipelinev1alpha1.PipelineRunSpec{}
@@ -677,7 +681,7 @@ func TestReconcile(t *testing.T) {
 				if err != nil {
 					panic(err)
 				}
-				return p
+				return []*pipelinev1alpha1.PipelineRun{p}
 			}(),
 		},
 		{
@@ -736,7 +740,7 @@ func TestReconcile(t *testing.T) {
 					Description: "fancy",
 				},
 			},
-			observedPipelineRun: func() *pipelinev1alpha1.PipelineRun {
+			observedPipelineRuns: func() []*pipelinev1alpha1.PipelineRun {
 				pj := prowjobv1.ProwJob{}
 				pj.Spec.Type = prowjobv1.PeriodicJob
 				pj.Spec.Agent = prowjobv1.TektonAgent
@@ -751,8 +755,216 @@ func TestReconcile(t *testing.T) {
 					Status:  corev1.ConditionTrue,
 					Message: "hello",
 				})
-				return p
+				return []*pipelinev1alpha1.PipelineRun{p}
 			}(),
+		},
+		{
+			name: "with successful metapipeline and generated pipeline",
+			observedJob: &prowjobv1.ProwJob{
+				Spec: prowjobv1.ProwJobSpec{
+					Agent:           prowjobv1.TektonAgent,
+					PipelineRunSpec: &pipelineSpec,
+				},
+				Status: prowjobv1.ProwJobStatus{
+					State:       prowjobv1.PendingState,
+					Description: "fancy",
+				},
+			},
+			observedPipelineRuns: func() []*pipelinev1alpha1.PipelineRun {
+				pj := prowjobv1.ProwJob{}
+				pj.Spec.Type = prowjobv1.PeriodicJob
+				pj.Spec.Agent = prowjobv1.TektonAgent
+				pj.Spec.PipelineRunSpec = &pipelinev1alpha1.PipelineRunSpec{
+					ServiceAccount: "robot",
+				}
+				pr := makePipelineGitResource(pj)
+				metaP, err := makePipelineRunWithPrefix(pj, "5", pr, "meta")
+				if err != nil {
+					panic(err)
+				}
+				metaP.Status.SetCondition(&duckv1alpha1.Condition{
+					Type:    duckv1alpha1.ConditionSucceeded,
+					Status:  corev1.ConditionTrue,
+					Reason:  "Succeeded",
+					Message: "Metapipeline",
+				})
+				execP, err := makePipelineRun(pj, "5", pr)
+				if err != nil {
+					panic(err)
+				}
+				execP.Status.SetCondition(&duckv1alpha1.Condition{
+					Type:    duckv1alpha1.ConditionSucceeded,
+					Status:  corev1.ConditionTrue,
+					Reason:  "Succeeded",
+					Message: "Exec pipeline",
+				})
+				return []*pipelinev1alpha1.PipelineRun{metaP, execP}
+			}(),
+			expectedJob: func(pj prowjobv1.ProwJob, _ pipelinev1alpha1.PipelineRun) prowjobv1.ProwJob {
+				pj.Status = prowjobv1.ProwJobStatus{
+					StartTime:      now,
+					CompletionTime: &now,
+					State:          prowjobv1.SuccessState,
+					Description:    "Exec pipeline",
+				}
+				return pj
+			},
+			expectedPipelineRun: noPipelineRunChange,
+		},
+		{
+			name: "with successful metapipeline and running generated pipeline",
+			observedJob: &prowjobv1.ProwJob{
+				Spec: prowjobv1.ProwJobSpec{
+					Agent:           prowjobv1.TektonAgent,
+					PipelineRunSpec: &pipelineSpec,
+				},
+				Status: prowjobv1.ProwJobStatus{
+					State:       prowjobv1.PendingState,
+					Description: "fancy",
+				},
+			},
+			observedPipelineRuns: func() []*pipelinev1alpha1.PipelineRun {
+				pj := prowjobv1.ProwJob{}
+				pj.Spec.Type = prowjobv1.PeriodicJob
+				pj.Spec.Agent = prowjobv1.TektonAgent
+				pj.Spec.PipelineRunSpec = &pipelinev1alpha1.PipelineRunSpec{
+					ServiceAccount: "robot",
+				}
+				pr := makePipelineGitResource(pj)
+				metaP, err := makePipelineRunWithPrefix(pj, "5", pr, "meta")
+				if err != nil {
+					panic(err)
+				}
+				metaP.Status.SetCondition(&duckv1alpha1.Condition{
+					Type:    duckv1alpha1.ConditionSucceeded,
+					Status:  corev1.ConditionTrue,
+					Reason:  "Succeeded",
+					Message: "Metapipeline",
+				})
+				execP, err := makePipelineRun(pj, "5", pr)
+				if err != nil {
+					panic(err)
+				}
+				execP.Status.SetCondition(&duckv1alpha1.Condition{
+					Type:    duckv1alpha1.ConditionSucceeded,
+					Status:  corev1.ConditionUnknown,
+					Reason:  "Running",
+					Message: "Exec pipeline",
+				})
+				return []*pipelinev1alpha1.PipelineRun{metaP, execP}
+			}(),
+			expectedJob: func(pj prowjobv1.ProwJob, _ pipelinev1alpha1.PipelineRun) prowjobv1.ProwJob {
+				pj.Status = prowjobv1.ProwJobStatus{
+					StartTime:   now,
+					State:       prowjobv1.PendingState,
+					Description: "Exec pipeline",
+				}
+				return pj
+			},
+			expectedPipelineRun: noPipelineRunChange,
+		},
+		{
+			name: "with successful metapipeline and failed generated pipeline",
+			observedJob: &prowjobv1.ProwJob{
+				Spec: prowjobv1.ProwJobSpec{
+					Agent:           prowjobv1.TektonAgent,
+					PipelineRunSpec: &pipelineSpec,
+				},
+				Status: prowjobv1.ProwJobStatus{
+					State:       prowjobv1.PendingState,
+					Description: "fancy",
+				},
+			},
+			observedPipelineRuns: func() []*pipelinev1alpha1.PipelineRun {
+				pj := prowjobv1.ProwJob{}
+				pj.Spec.Type = prowjobv1.PeriodicJob
+				pj.Spec.Agent = prowjobv1.TektonAgent
+				pj.Spec.PipelineRunSpec = &pipelinev1alpha1.PipelineRunSpec{
+					ServiceAccount: "robot",
+				}
+				pr := makePipelineGitResource(pj)
+				metaP, err := makePipelineRunWithPrefix(pj, "5", pr, "meta")
+				if err != nil {
+					panic(err)
+				}
+				metaP.Status.SetCondition(&duckv1alpha1.Condition{
+					Type:    duckv1alpha1.ConditionSucceeded,
+					Status:  corev1.ConditionTrue,
+					Reason:  "Succeeded",
+					Message: "Metapipeline",
+				})
+				execP, err := makePipelineRun(pj, "5", pr)
+				if err != nil {
+					panic(err)
+				}
+				execP.Status.SetCondition(&duckv1alpha1.Condition{
+					Type:    duckv1alpha1.ConditionSucceeded,
+					Status:  corev1.ConditionFalse,
+					Reason:  "Failed",
+					Message: "Exec pipeline",
+				})
+				return []*pipelinev1alpha1.PipelineRun{metaP, execP}
+			}(),
+			expectedJob: func(pj prowjobv1.ProwJob, _ pipelinev1alpha1.PipelineRun) prowjobv1.ProwJob {
+				pj.Status = prowjobv1.ProwJobStatus{
+					StartTime:      now,
+					CompletionTime: &now,
+					State:          prowjobv1.FailureState,
+					Description:    "Exec pipeline",
+				}
+				return pj
+			},
+			expectedPipelineRun: noPipelineRunChange,
+		},
+		{
+			name: "with successful metapipeline and triggered generated pipeline",
+			observedJob: &prowjobv1.ProwJob{
+				Spec: prowjobv1.ProwJobSpec{
+					Agent:           prowjobv1.TektonAgent,
+					PipelineRunSpec: &pipelineSpec,
+				},
+				Status: prowjobv1.ProwJobStatus{
+					State:       prowjobv1.PendingState,
+					Description: "fancy",
+				},
+			},
+			observedPipelineRuns: func() []*pipelinev1alpha1.PipelineRun {
+				pj := prowjobv1.ProwJob{}
+				pj.Spec.Type = prowjobv1.PeriodicJob
+				pj.Spec.Agent = prowjobv1.TektonAgent
+				pj.Spec.PipelineRunSpec = &pipelinev1alpha1.PipelineRunSpec{
+					ServiceAccount: "robot",
+				}
+				pr := makePipelineGitResource(pj)
+				metaP, err := makePipelineRunWithPrefix(pj, "5", pr, "meta")
+				if err != nil {
+					panic(err)
+				}
+				metaP.Status.SetCondition(&duckv1alpha1.Condition{
+					Type:    duckv1alpha1.ConditionSucceeded,
+					Status:  corev1.ConditionTrue,
+					Reason:  "Succeeded",
+					Message: "Metapipeline",
+				})
+				execP, err := makePipelineRun(pj, "5", pr)
+				if err != nil {
+					panic(err)
+				}
+				execP.Status.SetCondition(&duckv1alpha1.Condition{
+					Type:    duckv1alpha1.ConditionReady,
+					Message: "hello",
+				})
+				return []*pipelinev1alpha1.PipelineRun{metaP, execP}
+			}(),
+			expectedJob: func(pj prowjobv1.ProwJob, _ pipelinev1alpha1.PipelineRun) prowjobv1.ProwJob {
+				pj.Status = prowjobv1.ProwJobStatus{
+					StartTime:   now,
+					State:       prowjobv1.TriggeredState,
+					Description: "scheduling",
+				}
+				return pj
+			},
+			expectedPipelineRun: noPipelineRunChange,
 		}}
 
 	for _, tc := range cases {
@@ -778,7 +990,21 @@ func TestReconcile(t *testing.T) {
 				r.jobs[jk] = *j
 			}
 			pk := toKey(tc.context, tc.namespace, name, pipelineRun)
-			if p := tc.observedPipelineRun; p != nil {
+			metapk := toKey(tc.context, tc.namespace, "meta-"+name, pipelineRun)
+			// If there's just one observed run, there's no metapipeline involved.
+			if len(tc.observedPipelineRuns) == 1 {
+				p := tc.observedPipelineRuns[0]
+				p.Name = name
+				p.Labels[kube.ProwJobIDLabel] = name
+				r.pipelines[pk] = *p
+			} else if len(tc.observedPipelineRuns) == 2 {
+				// The first is going to be the meta pipeline, the second the executing pipeline
+				mp := tc.observedPipelineRuns[0]
+				mp.Name = "meta-" + name
+				mp.Labels[kube.ProwJobIDLabel] = name
+				r.pipelines[metapk] = *mp
+
+				p := tc.observedPipelineRuns[1]
 				p.Name = name
 				p.Labels[kube.ProwJobIDLabel] = name
 				r.pipelines[pk] = *p
@@ -791,6 +1017,9 @@ func TestReconcile(t *testing.T) {
 			expectedPipelineRuns := map[string]pipelinev1alpha1.PipelineRun{}
 			if p := tc.expectedPipelineRun; p != nil {
 				expectedPipelineRuns[pk] = p(r.jobs[jk], r.pipelines[pk])
+				if val, ok := r.pipelines[metapk]; ok {
+					expectedPipelineRuns[metapk] = p(r.jobs[jk], val)
+				}
 			}
 
 			tk := toKey(tc.context, tc.namespace, name, prowJob)
@@ -1218,7 +1447,7 @@ func TestProwJobStatus(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			state, desc := prowJobStatus(tc.input)
+			state, desc := prowJobStatusForSinglePipelineRun(tc.input)
 			if state != tc.state {
 				t.Errorf("state %q != expected %q", state, tc.state)
 			}
